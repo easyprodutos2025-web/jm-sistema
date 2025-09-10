@@ -4,649 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JM TECNOLOGIA Use Cases</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
-    
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-        import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, runTransaction, increment } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
-        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
-        import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
-
-        // Configuração do Firebase
-        const firebaseConfig = {
-            apiKey: "AIzaSyCNCheV1ezBEcilueuGuWM9FF4Pn8pBhXo",
-            authDomain: "jm-tecnologia-use-cases.firebaseapp.com",
-            projectId: "jm-tecnologia-use-cases",
-            storageBucket: "jm-tecnologia-use-cases.firebasestorage.app",
-            messagingSenderId: "1039370626796",
-            appId: "1:1039370626796:web:db89f13b918d377e6667c9",
-            measurementId: "G-EJQNDRXELH"
-        };
-
-        // Inicializar Firebase
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-        const storage = getStorage(app);
-
-        // Variáveis globais
-        window.db = db;
-        window.auth = auth;
-        window.storage = storage;
-        window.firebaseModules = {
-            collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, runTransaction, increment,
-            signInWithEmailAndPassword, signOut, onAuthStateChanged,
-            ref, uploadBytes, getDownloadURL, deleteObject
-        };
-
-        // Estado da aplicação
-        let currentUser = null;
-        let documentos = [];
-        let subtarefas = [];
-        let currentView = 'login';
-        let editingId = null;
-
-        // Verificar autenticação
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                // Verificar se o email está autorizado no banco
-                const isAuthorized = await verificarEmailAutorizado(user.email);
-                if (isAuthorized) {
-                    currentUser = user;
-                    showView('home');
-                    showNotification('Login realizado com sucesso!', 'success');
-                    carregarDocumentos();
-                } else {
-                    await signOut(auth);
-                    showNotification('Email não autorizado para acessar o sistema.', 'error');
-                    showView('login');
-                }
-            } else {
-                currentUser = null;
-                showView('login');
-            }
-        });
-
-        // Verificar se email está autorizado
-        async function verificarEmailAutorizado(email) {
-            try {
-                const usuariosRef = collection(db, 'usuarios_autorizados');
-                const snapshot = await getDocs(usuariosRef);
-                
-                for (const doc of snapshot.docs) {
-                    const userData = doc.data();
-                    if (userData.email === email && userData.ativo === true) {
-                        return true;
-                    }
-                }
-                return false;
-            } catch (error) {
-                console.error('Erro ao verificar autorização:', error);
-                return false;
-            }
-        }
-
-        // Função de login
-        window.fazerLogin = async () => {
-            const email = document.getElementById('loginEmail').value;
-            const password = document.getElementById('loginPassword').value;
-
-            if (!email || !password) {
-                showNotification('Por favor, preencha email e senha.', 'error');
-                return;
-            }
-
-            try {
-                showNotification('Verificando credenciais...', 'info');
-                await signInWithEmailAndPassword(auth, email, password);
-            } catch (error) {
-                console.error('Erro no login:', error);
-                let errorMessage = 'Erro no login. Verifique suas credenciais.';
-                
-                if (error.code === 'auth/user-not-found') {
-                    errorMessage = 'Usuário não encontrado.';
-                } else if (error.code === 'auth/wrong-password') {
-                    errorMessage = 'Senha incorreta.';
-                } else if (error.code === 'auth/invalid-email') {
-                    errorMessage = 'Email inválido.';
-                }
-                
-                showNotification(errorMessage, 'error');
-            }
-        };
-
-        // Função de logout
-        window.fazerLogout = async () => {
-            try {
-                await signOut(auth);
-                showNotification('Logout realizado com sucesso!', 'success');
-            } catch (error) {
-                console.error('Erro no logout:', error);
-                showNotification('Erro ao fazer logout.', 'error');
-            }
-        };
-
-        // Gerar próximo código automaticamente
-        async function gerarProximoCodigo() {
-            try {
-                const counterRef = doc(db, 'counters', 'documentos');
-                
-                return await runTransaction(db, async (transaction) => {
-                    const counterDoc = await transaction.get(counterRef);
-                    
-                    let nextNumber = 1;
-                    if (counterDoc.exists()) {
-                        nextNumber = (counterDoc.data().count || 0) + 1;
-                    }
-                    
-                    transaction.set(counterRef, { count: nextNumber }, { merge: true });
-                    
-                    return `UC-${String(nextNumber).padStart(3, '0')}`;
-                });
-            } catch (error) {
-                console.error('Erro ao gerar código:', error);
-                throw error;
-            }
-        }
-
-        // Gerar código de subtarefa
-        function gerarCodigoSubtarefa(codigoPai, subtarefasExistentes) {
-            const subtarefasDoPai = subtarefasExistentes.filter(s => s.parentId === codigoPai);
-            const proximoNumero = subtarefasDoPai.length + 1;
-            return `${codigoPai}.${proximoNumero}`;
-        }
-
-        // Upload de arquivo
-        async function uploadArquivo(file, documentId) {
-            try {
-                const fileName = `${documentId}/${Date.now()}_${file.name}`;
-                const storageRef = ref(storage, `anexos/${fileName}`);
-                
-                const snapshot = await uploadBytes(storageRef, file);
-                const downloadURL = await getDownloadURL(snapshot.ref);
-                
-                return {
-                    nome: file.name,
-                    url: downloadURL,
-                    tamanho: file.size,
-                    tipo: file.type,
-                    path: fileName
-                };
-            } catch (error) {
-                console.error('Erro no upload:', error);
-                throw error;
-            }
-        }
-
-        // Salvar documento
-        window.salvarDocumento = async () => {
-            try {
-                const titulo = document.getElementById('titulo').value;
-                const autor = document.getElementById('autor').value;
-                const responsavel = document.getElementById('responsavel').value;
-                const descricao = document.getElementById('descricao').value;
-                const problema = document.getElementById('problema').value;
-                const solucao = document.getElementById('solucao').value;
-
-                if (!titulo) {
-                    showNotification('Título é obrigatório!', 'error');
-                    return;
-                }
-
-                showNotification('Salvando documento...', 'info');
-
-                let codigo;
-                let anexos = [];
-
-                if (editingId) {
-                    // Editando documento existente
-                    const docToEdit = documentos.find(d => d.id === editingId);
-                    codigo = docToEdit.codigo;
-                    anexos = docToEdit.anexos || [];
-                } else {
-                    // Novo documento
-                    codigo = await gerarProximoCodigo();
-                }
-
-                // Processar anexos
-                const fileInput = document.getElementById('anexos');
-                if (fileInput.files.length > 0) {
-                    for (const file of fileInput.files) {
-                        if (file.size > 10 * 1024 * 1024) { // 10MB
-                            showNotification(`Arquivo ${file.name} é muito grande (máximo 10MB)`, 'error');
-                            continue;
-                        }
-                        
-                        const anexo = await uploadArquivo(file, codigo);
-                        anexos.push(anexo);
-                    }
-                }
-
-                const agora = new Date();
-                const documento = {
-                    codigo,
-                    titulo,
-                    autor: autor || currentUser.email,
-                    responsavel,
-                    descricao,
-                    problema,
-                    solucao,
-                    anexos,
-                    dataCriacao: editingId ? documentos.find(d => d.id === editingId).dataCriacao : agora,
-                    dataModificacao: agora,
-                    status: 'Ativo'
-                };
-
-                if (editingId) {
-                    await updateDoc(doc(db, 'documentos', editingId), documento);
-                    showNotification('Documento atualizado com sucesso!', 'success');
-                } else {
-                    await addDoc(collection(db, 'documentos'), documento);
-                    showNotification('Documento salvo com sucesso!', 'success');
-                }
-
-                showView('home');
-                carregarDocumentos();
-                limparFormulario();
-
-            } catch (error) {
-                console.error('Erro ao salvar:', error);
-                showNotification('Erro ao salvar documento: ' + error.message, 'error');
-            }
-        };
-
-        // Carregar documentos
-        async function carregarDocumentos() {
-            try {
-                showNotification('Carregando documentos...', 'info');
-                
-                const q = query(collection(db, 'documentos'), orderBy('codigo', 'asc'));
-                const querySnapshot = await getDocs(q);
-                
-                documentos = [];
-                querySnapshot.forEach((doc) => {
-                    documentos.push({
-                        id: doc.id,
-                        ...doc.data()
-                    });
-                });
-
-                renderizarDocumentos();
-                showNotification('Documentos carregados com sucesso!', 'success');
-                
-            } catch (error) {
-                console.error('Erro ao carregar documentos:', error);
-                showNotification('Erro ao carregar documentos: ' + error.message, 'error');
-            }
-        }
-
-        // Renderizar lista de documentos
-        function renderizarDocumentos() {
-            const container = document.getElementById('documentosList');
-            
-            if (documentos.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-icon">📋</div>
-                        <h3>Nenhum documento encontrado</h3>
-                        <p>Clique em "Iniciar Criação" para criar seu primeiro documento.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            container.innerHTML = documentos.map(doc => `
-                <div class="documento-card" data-id="${doc.id}">
-                    <div class="documento-header">
-                        <div class="documento-codigo">${doc.codigo}</div>
-                        <div class="documento-status">${doc.status || 'Ativo'}</div>
-                    </div>
-                    <div class="documento-content">
-                        <h3 class="documento-titulo">${doc.titulo}</h3>
-                        <div class="documento-meta">
-                            <span><strong>Autor:</strong> ${doc.autor}</span>
-                            <span><strong>Data:</strong> ${formatarData(doc.dataCriacao)}</span>
-                        </div>
-                        ${doc.descricao ? `<p class="documento-descricao">${doc.descricao.substring(0, 150)}${doc.descricao.length > 150 ? '...' : ''}</p>` : ''}
-                        ${doc.anexos && doc.anexos.length > 0 ? `
-                            <div class="documento-anexos">
-                                <span class="anexos-count">📎 ${doc.anexos.length} anexo(s)</span>
-                            </div>
-                        ` : ''}
-                    </div>
-                    <div class="documento-actions">
-                        <button onclick="editarDocumento('${doc.id}')" class="btn-action btn-edit">
-                            ✏️ Editar
-                        </button>
-                        <button onclick="duplicarDocumento('${doc.id}')" class="btn-action btn-duplicate">
-                            📋 Duplicar
-                        </button>
-                        <button onclick="excluirDocumento('${doc.id}')" class="btn-action btn-delete">
-                            🗑️ Excluir
-                        </button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // Editar documento
-        window.editarDocumento = (id) => {
-            const documento = documentos.find(d => d.id === id);
-            if (!documento) return;
-
-            editingId = id;
-            
-            document.getElementById('codigo').value = documento.codigo;
-            document.getElementById('titulo').value = documento.titulo || '';
-            document.getElementById('autor').value = documento.autor || '';
-            document.getElementById('responsavel').value = documento.responsavel || '';
-            document.getElementById('descricao').value = documento.descricao || '';
-            document.getElementById('problema').value = documento.problema || '';
-            document.getElementById('solucao').value = documento.solucao || '';
-
-            // Mostrar anexos existentes
-            if (documento.anexos && documento.anexos.length > 0) {
-                const anexosContainer = document.getElementById('anexosExistentes');
-                anexosContainer.innerHTML = documento.anexos.map(anexo => `
-                    <div class="anexo-item">
-                        <span>📎 ${anexo.nome}</span>
-                        <a href="${anexo.url}" target="_blank" class="btn-download">⬇️ Download</a>
-                    </div>
-                `).join('');
-                anexosContainer.style.display = 'block';
-            }
-
-            showView('form');
-        };
-
-        // Duplicar documento
-        window.duplicarDocumento = async (id) => {
-            const documento = documentos.find(d => d.id === id);
-            if (!documento) return;
-
-            try {
-                const novoCodigo = await gerarProximoCodigo();
-                const agora = new Date();
-                
-                const novoDocumento = {
-                    ...documento,
-                    codigo: novoCodigo,
-                    titulo: `${documento.titulo} (Cópia)`,
-                    dataCriacao: agora,
-                    dataModificacao: agora,
-                    anexos: [] // Não duplicar anexos
-                };
-
-                delete novoDocumento.id;
-
-                await addDoc(collection(db, 'documentos'), novoDocumento);
-                showNotification('Documento duplicado com sucesso!', 'success');
-                carregarDocumentos();
-
-            } catch (error) {
-                console.error('Erro ao duplicar:', error);
-                showNotification('Erro ao duplicar documento: ' + error.message, 'error');
-            }
-        };
-
-        // Excluir documento
-        window.excluirDocumento = async (id) => {
-            const senha = prompt('Digite a senha para excluir:');
-            if (!senha) return;
-
-            if (!senha.startsWith('josimar') && senha !== '*Josimar****@@@@') {
-                showNotification('Senha incorreta!', 'error');
-                return;
-            }
-
-            try {
-                await deleteDoc(doc(db, 'documentos', id));
-                showNotification('Documento excluído com sucesso!', 'success');
-                carregarDocumentos();
-            } catch (error) {
-                console.error('Erro ao excluir:', error);
-                showNotification('Erro ao excluir documento: ' + error.message, 'error');
-            }
-        };
-
-        // Funções de navegação
-        window.showView = (view) => {
-            currentView = view;
-            
-            // Esconder todas as views
-            document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
-            
-            // Mostrar view atual
-            document.getElementById(view + 'View').style.display = 'block';
-            
-            // Atualizar header
-            const header = document.querySelector('.header');
-            if (view === 'login') {
-                header.style.display = 'none';
-            } else {
-                header.style.display = 'flex';
-                document.getElementById('userEmail').textContent = currentUser ? currentUser.email : '';
-            }
-
-            // Gerar código automático para novos documentos
-            if (view === 'form' && !editingId) {
-                gerarProximoCodigo().then(codigo => {
-                    document.getElementById('codigo').value = codigo;
-                    showNotification('Código gerado automaticamente: ' + codigo, 'info');
-                }).catch(error => {
-                    console.error('Erro ao gerar código:', error);
-                    showNotification('Erro ao gerar código automático', 'error');
-                });
-            }
-        };
-
-        window.novoDocumento = () => {
-            editingId = null;
-            limparFormulario();
-            showView('form');
-        };
-
-        // Limpar formulário
-        function limparFormulario() {
-            document.getElementById('documentForm').reset();
-            document.getElementById('anexosExistentes').style.display = 'none';
-            document.getElementById('anexosExistentes').innerHTML = '';
-        }
-
-        // Funções utilitárias
-        function formatarData(data) {
-            if (!data) return '';
-            const date = data.toDate ? data.toDate() : new Date(data);
-            return date.toLocaleDateString('pt-BR');
-        }
-
-        function showNotification(message, type = 'info') {
-            const notification = document.createElement('div');
-            notification.className = `notification ${type}`;
-            notification.textContent = message;
-            
-            document.body.appendChild(notification);
-            
-            setTimeout(() => {
-                notification.classList.add('show');
-            }, 100);
-            
-            setTimeout(() => {
-                notification.classList.remove('show');
-                setTimeout(() => {
-                    document.body.removeChild(notification);
-                }, 300);
-            }, 3000);
-        }
-
-        // Busca
-        window.buscarDocumentos = () => {
-            const termo = document.getElementById('searchInput').value.toLowerCase();
-            const documentosFiltrados = documentos.filter(doc => 
-                doc.titulo.toLowerCase().includes(termo) ||
-                doc.codigo.toLowerCase().includes(termo) ||
-                (doc.autor && doc.autor.toLowerCase().includes(termo)) ||
-                (doc.descricao && doc.descricao.toLowerCase().includes(termo))
-            );
-            
-            renderizarDocumentosFiltrados(documentosFiltrados);
-        };
-
-        function renderizarDocumentosFiltrados(docs) {
-            const container = document.getElementById('documentosList');
-            
-            if (docs.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-icon">🔍</div>
-                        <h3>Nenhum documento encontrado</h3>
-                        <p>Tente ajustar os termos da busca.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            container.innerHTML = docs.map(doc => `
-                <div class="documento-card" data-id="${doc.id}">
-                    <div class="documento-header">
-                        <div class="documento-codigo">${doc.codigo}</div>
-                        <div class="documento-status">${doc.status || 'Ativo'}</div>
-                    </div>
-                    <div class="documento-content">
-                        <h3 class="documento-titulo">${doc.titulo}</h3>
-                        <div class="documento-meta">
-                            <span><strong>Autor:</strong> ${doc.autor}</span>
-                            <span><strong>Data:</strong> ${formatarData(doc.dataCriacao)}</span>
-                        </div>
-                        ${doc.descricao ? `<p class="documento-descricao">${doc.descricao.substring(0, 150)}${doc.descricao.length > 150 ? '...' : ''}</p>` : ''}
-                        ${doc.anexos && doc.anexos.length > 0 ? `
-                            <div class="documento-anexos">
-                                <span class="anexos-count">📎 ${doc.anexos.length} anexo(s)</span>
-                            </div>
-                        ` : ''}
-                    </div>
-                    <div class="documento-actions">
-                        <button onclick="editarDocumento('${doc.id}')" class="btn-action btn-edit">
-                            ✏️ Editar
-                        </button>
-                        <button onclick="duplicarDocumento('${doc.id}')" class="btn-action btn-duplicate">
-                            📋 Duplicar
-                        </button>
-                        <button onclick="excluirDocumento('${doc.id}')" class="btn-action btn-delete">
-                            🗑️ Excluir
-                        </button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // Exportação
-        window.exportarDados = (formato) => {
-            if (documentos.length === 0) {
-                showNotification('Nenhum documento para exportar!', 'error');
-                return;
-            }
-
-            switch (formato) {
-                case 'json':
-                    exportarJSON();
-                    break;
-                case 'csv':
-                    exportarCSV();
-                    break;
-                default:
-                    showNotification('Formato não suportado!', 'error');
-            }
-        };
-
-        function exportarJSON() {
-            const dados = {
-                documentos: documentos,
-                exportadoEm: new Date().toISOString(),
-                total: documentos.length
-            };
-
-            const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `jm-use-cases-${new Date().toISOString().split('T')[0]}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-            
-            showNotification('Dados exportados em JSON!', 'success');
-        }
-
-        function exportarCSV() {
-            const headers = ['Código', 'Título', 'Autor', 'Responsável', 'Descrição', 'Data Criação', 'Status'];
-            const rows = documentos.map(doc => [
-                doc.codigo,
-                doc.titulo,
-                doc.autor || '',
-                doc.responsavel || '',
-                doc.descricao || '',
-                formatarData(doc.dataCriacao),
-                doc.status || 'Ativo'
-            ]);
-
-            const csvContent = [headers, ...rows]
-                .map(row => row.map(field => `"${field}"`).join(','))
-                .join('\n');
-
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `jm-use-cases-${new Date().toISOString().split('T')[0]}.csv`;
-            a.click();
-            URL.revokeObjectURL(url);
-            
-            showNotification('Dados exportados em CSV!', 'success');
-        }
-
-        // Inicialização
-        document.addEventListener('DOMContentLoaded', () => {
-            showNotification('Sistema JM TECNOLOGIA carregado com sucesso!', 'success');
-            
-            // Configurar drag and drop para anexos
-            const dropZone = document.getElementById('dropZone');
-            const fileInput = document.getElementById('anexos');
-
-            dropZone.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                dropZone.classList.add('dragover');
-            });
-
-            dropZone.addEventListener('dragleave', () => {
-                dropZone.classList.remove('dragover');
-            });
-
-            dropZone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                dropZone.classList.remove('dragover');
-                
-                const files = Array.from(e.dataTransfer.files);
-                fileInput.files = e.dataTransfer.files;
-                
-                showNotification(`${files.length} arquivo(s) selecionado(s)`, 'success');
-            });
-
-            dropZone.addEventListener('click', () => {
-                fileInput.click();
-            });
-
-            fileInput.addEventListener('change', (e) => {
-                const files = Array.from(e.target.files);
-                if (files.length > 0) {
-                    showNotification(`${files.length} arquivo(s) selecionado(s)`, 'success');
-                }
-            });
-        });
-
-    </script>
-
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
+        :root {
+            --primary-color: #0066ff;
+            --secondary-color: #00ccff;
+            --accent-color: #ff6b35;
+            --success-color: #00ff88;
+            --warning-color: #ffaa00;
+            --error-color: #ff4757;
+            --bg-primary: #0a0a0a;
+            --bg-secondary: #1a1a1a;
+            --bg-tertiary: #2a2a2a;
+            --text-primary: #ffffff;
+            --text-secondary: #cccccc;
+            --text-muted: #888888;
+            --border-color: #333333;
+            --shadow-color: rgba(0, 102, 255, 0.3);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -655,30 +31,109 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a1a 50%, #0c0c0c 100%);
-            color: #ffffff;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            color: var(--text-primary);
             min-height: 100vh;
-            line-height: 1.6;
+            overflow-x: hidden;
         }
 
+        /* Animated Background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(0, 102, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(0, 204, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(255, 107, 53, 0.05) 0%, transparent 50%);
+            z-index: -1;
+            animation: backgroundShift 20s ease-in-out infinite;
+        }
+
+        @keyframes backgroundShift {
+            0%, 100% { transform: translateX(0) translateY(0); }
+            25% { transform: translateX(-20px) translateY(-20px); }
+            50% { transform: translateX(20px) translateY(-20px); }
+            75% { transform: translateX(-20px) translateY(20px); }
+        }
+
+        /* Header */
         .header {
-            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
             padding: 1rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-            border-bottom: 1px solid #333;
+        }
+
+        .header-content {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            backdrop-filter: blur(10px);
+            max-width: 1400px;
+            margin: 0 auto;
         }
 
         .logo {
-            font-size: 1.5rem;
-            font-weight: bold;
-            background: linear-gradient(45deg, #00d4ff, #0099cc);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo i {
+            font-size: 2rem;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+        }
+
+        .logo h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-online { background-color: var(--success-color); }
+        .status-connecting { background-color: var(--warning-color); }
+        .status-offline { background-color: var(--error-color); }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
 
         .user-info {
@@ -687,539 +142,201 @@
             gap: 1rem;
         }
 
-        .user-email {
-            color: #cccccc;
-            font-size: 0.9rem;
-        }
-
-        .btn-logout {
-            background: linear-gradient(45deg, #ff4757, #ff3742);
+        .logout-btn {
+            background: linear-gradient(135deg, var(--error-color), #ff6b6b);
             color: white;
             border: none;
             padding: 0.5rem 1rem;
-            border-radius: 8px;
+            border-radius: 25px;
             cursor: pointer;
-            font-weight: 500;
+            font-weight: 600;
             transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
-        .btn-logout:hover {
+        .logout-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(255, 71, 87, 0.3);
+            box-shadow: 0 8px 25px rgba(255, 71, 87, 0.4);
         }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-
-        .view {
-            display: none;
-        }
-
-        /* Login View */
-        .login-container {
+        /* Login Screen */
+        .login-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
-            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a1a 50%, #0c0c0c 100%);
+            z-index: 10000;
         }
 
-        .login-card {
-            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-            padding: 3rem;
+        .login-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
-            border: 1px solid #333;
-            backdrop-filter: blur(10px);
+            padding: 3rem;
             width: 100%;
             max-width: 400px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
         }
 
-        .login-title {
-            text-align: center;
-            margin-bottom: 2rem;
-            font-size: 2rem;
-            background: linear-gradient(45deg, #00d4ff, #0099cc);
+        .login-logo {
+            font-size: 3rem;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            margin-bottom: 1rem;
+        }
+
+        .login-title {
+            font-size: 1.5rem;
+            margin-bottom: 2rem;
+            color: var(--text-primary);
         }
 
         .form-group {
             margin-bottom: 1.5rem;
+            text-align: left;
         }
 
         .form-group label {
             display: block;
             margin-bottom: 0.5rem;
-            color: #cccccc;
-            font-weight: 500;
+            color: var(--text-secondary);
+            font-weight: 600;
         }
 
         .form-control {
             width: 100%;
             padding: 1rem;
-            border: 1px solid #444;
+            border: 1px solid var(--border-color);
             border-radius: 10px;
-            background: rgba(255, 255, 255, 0.05);
-            color: #ffffff;
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
             font-size: 1rem;
             transition: all 0.3s ease;
-            backdrop-filter: blur(10px);
         }
 
         .form-control:focus {
             outline: none;
-            border-color: #00d4ff;
-            box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
-            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--primary-color);
+            box-shadow: 0 0 20px rgba(0, 102, 255, 0.3);
         }
 
         .btn-primary {
-            width: 100%;
-            background: linear-gradient(45deg, #00d4ff, #0099cc);
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
             color: white;
             border: none;
-            padding: 1rem;
+            padding: 1rem 2rem;
             border-radius: 10px;
-            font-size: 1.1rem;
-            font-weight: 600;
             cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            width: 100%;
             transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
         }
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.3);
+            box-shadow: 0 10px 30px rgba(0, 102, 255, 0.4);
         }
 
-        /* Home View */
-        .home-header {
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Main Container */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 2rem;
+            min-height: calc(100vh - 100px);
+        }
+
+        .main-content {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .sidebar {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+            height: fit-content;
+            position: sticky;
+            top: 120px;
+        }
+
+        /* Navigation */
+        .nav-tabs {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            gap: 1rem;
             margin-bottom: 2rem;
-            flex-wrap: wrap;
-            gap: 1rem;
+            border-bottom: 1px solid var(--border-color);
         }
 
-        .home-title {
-            font-size: 2.5rem;
-            background: linear-gradient(45deg, #00d4ff, #0099cc);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .home-actions {
-            display: flex;
-            gap: 1rem;
-            flex-wrap: wrap;
-        }
-
-        .btn {
-            padding: 0.75rem 1.5rem;
+        .nav-tab {
+            background: transparent;
+            color: var(--text-secondary);
             border: none;
-            border-radius: 10px;
+            padding: 1rem 1.5rem;
+            border-radius: 10px 10px 0 0;
             cursor: pointer;
             font-weight: 600;
             transition: all 0.3s ease;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
+            position: relative;
         }
 
-        .btn-success {
-            background: linear-gradient(45deg, #2ed573, #1dd1a1);
-            color: white;
+        .nav-tab.active {
+            color: var(--primary-color);
+            background: rgba(0, 102, 255, 0.1);
         }
 
-        .btn-info {
-            background: linear-gradient(45deg, #00d4ff, #0099cc);
-            color: white;
+        .nav-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
         }
 
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
-        }
-
-        .search-container {
-            margin-bottom: 2rem;
-        }
-
-        .search-input {
-            width: 100%;
-            max-width: 400px;
-            padding: 1rem;
-            border: 1px solid #444;
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.05);
-            color: #ffffff;
-            font-size: 1rem;
-            backdrop-filter: blur(10px);
-        }
-
-        .search-input:focus {
-            outline: none;
-            border-color: #00d4ff;
-            box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
-        }
-
-        /* Documentos */
-        .documentos-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            gap: 1.5rem;
-        }
-
-        .documento-card {
-            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-            border-radius: 15px;
-            padding: 1.5rem;
-            border: 1px solid #333;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(10px);
-        }
-
-        .documento-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
-            border-color: #00d4ff;
-        }
-
-        .documento-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-
-        .documento-codigo {
-            background: linear-gradient(45deg, #00d4ff, #0099cc);
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-weight: bold;
-            font-size: 0.9rem;
-        }
-
-        .documento-status {
-            background: linear-gradient(45deg, #2ed573, #1dd1a1);
-            color: white;
-            padding: 0.3rem 0.8rem;
-            border-radius: 15px;
-            font-size: 0.8rem;
-        }
-
-        .documento-titulo {
-            color: #ffffff;
-            margin-bottom: 0.5rem;
-            font-size: 1.2rem;
-        }
-
-        .documento-meta {
-            color: #cccccc;
-            font-size: 0.9rem;
-            margin-bottom: 1rem;
-        }
-
-        .documento-meta span {
-            display: block;
-            margin-bottom: 0.2rem;
-        }
-
-        .documento-descricao {
-            color: #aaaaaa;
-            font-size: 0.9rem;
-            margin-bottom: 1rem;
-            line-height: 1.5;
-        }
-
-        .documento-anexos {
-            margin-bottom: 1rem;
-        }
-
-        .anexos-count {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 0.3rem 0.8rem;
-            border-radius: 15px;
-            font-size: 0.8rem;
-            color: #cccccc;
-        }
-
-        .documento-actions {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-        }
-
-        .btn-action {
-            padding: 0.5rem 1rem;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 0.8rem;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            flex: 1;
-            min-width: 80px;
-        }
-
-        .btn-edit {
-            background: linear-gradient(45deg, #ffa502, #ff6348);
-            color: white;
-        }
-
-        .btn-duplicate {
-            background: linear-gradient(45deg, #3742fa, #2f3542);
-            color: white;
-        }
-
-        .btn-delete {
-            background: linear-gradient(45deg, #ff4757, #ff3742);
-            color: white;
-        }
-
-        .btn-action:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-        }
-
-        /* Form View */
-        .form-container {
-            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-            border-radius: 20px;
-            padding: 2rem;
-            border: 1px solid #333;
-            backdrop-filter: blur(10px);
-        }
-
-        .form-title {
-            font-size: 2rem;
-            margin-bottom: 2rem;
-            background: linear-gradient(45deg, #00d4ff, #0099cc);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        textarea.form-control {
-            min-height: 120px;
-            resize: vertical;
-        }
-
-        .codigo-info {
-            background: rgba(0, 212, 255, 0.1);
-            border: 1px solid #00d4ff;
-            border-radius: 10px;
-            padding: 1rem;
-            margin-bottom: 1.5rem;
-            color: #00d4ff;
-        }
-
-        /* Anexos */
-        .anexos-section {
-            margin-bottom: 2rem;
-        }
-
-        .drop-zone {
-            border: 2px dashed #444;
-            border-radius: 10px;
-            padding: 2rem;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            background: rgba(255, 255, 255, 0.02);
-        }
-
-        .drop-zone:hover,
-        .drop-zone.dragover {
-            border-color: #00d4ff;
-            background: rgba(0, 212, 255, 0.05);
-        }
-
-        .drop-zone-text {
-            color: #cccccc;
-            font-size: 1.1rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .drop-zone-subtext {
-            color: #888;
-            font-size: 0.9rem;
-        }
-
-        .anexos-existentes {
+        /* Content Sections */
+        .content-section {
             display: none;
-            margin-top: 1rem;
         }
 
-        .anexo-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: rgba(255, 255, 255, 0.05);
-            padding: 0.8rem;
-            border-radius: 8px;
-            margin-bottom: 0.5rem;
+        .content-section.active {
+            display: block;
+            animation: fadeInUp 0.5s ease;
         }
 
-        .btn-download {
-            background: linear-gradient(45deg, #00d4ff, #0099cc);
-            color: white;
-            text-decoration: none;
-            padding: 0.3rem 0.8rem;
-            border-radius: 5px;
-            font-size: 0.8rem;
-            transition: all 0.3s ease;
-        }
-
-        .btn-download:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 10px rgba(0, 212, 255, 0.3);
-        }
-
-        /* Form Actions */
-        .form-actions {
-            display: flex;
-            gap: 1rem;
-            justify-content: flex-end;
-            margin-top: 2rem;
-            flex-wrap: wrap;
-        }
-
-        .btn-secondary {
-            background: linear-gradient(45deg, #57606f, #2f3542);
-            color: white;
-        }
-
-        /* Empty State */
-        .empty-state {
-            text-align: center;
-            padding: 4rem 2rem;
-            color: #666;
-        }
-
-        .empty-icon {
-            font-size: 4rem;
-            margin-bottom: 1rem;
-        }
-
-        .empty-state h3 {
-            margin-bottom: 1rem;
-            color: #888;
-        }
-
-        /* Notifications */
-        .notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 1rem 1.5rem;
-            border-radius: 10px;
-            color: white;
-            font-weight: 500;
-            z-index: 1000;
-            transform: translateX(400px);
-            transition: all 0.3s ease;
-            max-width: 400px;
-            backdrop-filter: blur(10px);
-        }
-
-        .notification.show {
-            transform: translateX(0);
-        }
-
-        .notification.success {
-            background: linear-gradient(45deg, #2ed573, #1dd1a1);
-        }
-
-        .notification.error {
-            background: linear-gradient(45deg, #ff4757, #ff3742);
-        }
-
-        .notification.info {
-            background: linear-gradient(45deg, #00d4ff, #0099cc);
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .container {
-                padding: 1rem;
-            }
-
-            .header {
-                padding: 1rem;
-                flex-direction: column;
-                gap: 1rem;
-            }
-
-            .home-header {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .home-actions {
-                justify-content: center;
-            }
-
-            .documentos-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-
-            .form-actions {
-                justify-content: stretch;
-            }
-
-            .form-actions .btn {
-                flex: 1;
-            }
-
-            .notification {
-                right: 10px;
-                left: 10px;
-                max-width: none;
-            }
-        }
-
-        /* Scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: #1a1a1a;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: linear-gradient(45deg, #00d4ff, #0099cc);
-            border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: linear-gradient(45deg, #0099cc, #007399);
-        }
-
-        /* Animations */
-        @keyframes fadeIn {
+        @keyframes fadeInUp {
             from {
                 opacity: 0;
                 transform: translateY(20px);
@@ -1230,149 +347,1709 @@
             }
         }
 
-        .documento-card {
-            animation: fadeIn 0.5s ease-out;
+        /* Welcome Section */
+        .welcome-section {
+            text-align: center;
+            padding: 3rem 0;
         }
 
-        /* Hidden file input */
-        #anexos {
-            display: none;
+        .welcome-title {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .welcome-subtitle {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 102, 255, 0.4);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, var(--bg-tertiary), var(--border-color));
+        }
+
+        .btn-secondary:hover {
+            box-shadow: 0 10px 30px rgba(255, 255, 255, 0.1);
+        }
+
+        /* Form Styles */
+        .form-section {
+            margin-bottom: 2rem;
+        }
+
+        .section-title {
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .form-row.full {
+            grid-template-columns: 1fr;
+        }
+
+        .form-control {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1rem;
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 20px rgba(0, 102, 255, 0.3);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        textarea.form-control {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        /* File Upload */
+        .file-upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: 10px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .file-upload-area:hover,
+        .file-upload-area.dragover {
+            border-color: var(--primary-color);
+            background: rgba(0, 102, 255, 0.1);
+        }
+
+        .file-upload-icon {
+            font-size: 3rem;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+
+        .file-upload-text {
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .file-list {
+            margin-top: 1rem;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .file-remove {
+            background: var(--error-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Subtasks */
+        .subtasks-section {
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .subtask-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            position: relative;
+        }
+
+        .subtask-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .subtask-code {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .subtask-remove {
+            background: var(--error-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .add-subtask-btn {
+            background: linear-gradient(135deg, var(--success-color), #00d4aa);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .add-subtask-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 255, 136, 0.4);
+        }
+
+        /* Document List */
+        .document-list {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .document-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 15px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .document-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 102, 255, 0.2);
+            border-color: var(--primary-color);
+        }
+
+        .document-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .document-code {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .document-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .action-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            border-radius: 8px;
+            padding: 0.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .action-btn:hover {
+            background: var(--primary-color);
+            color: white;
+            transform: scale(1.1);
+        }
+
+        .document-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .document-meta {
+            display: flex;
+            gap: 1rem;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+
+        .document-description {
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        /* Search and Filters */
+        .search-section {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .filter-select {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1rem;
+            color: var(--text-primary);
+            cursor: pointer;
+        }
+
+        /* Export Section */
+        .export-section {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .export-btn {
+            background: linear-gradient(135deg, var(--accent-color), #ff8c42);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .export-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 107, 53, 0.4);
+        }
+
+        /* Mariano Assistant */
+        .mariano-container {
+            background: linear-gradient(135deg, rgba(0, 102, 255, 0.1), rgba(0, 204, 255, 0.1));
+            border: 1px solid rgba(0, 102, 255, 0.3);
+            border-radius: 20px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .mariano-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .mariano-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+        }
+
+        .mariano-info h3 {
+            color: var(--primary-color);
+            margin-bottom: 0.2rem;
+        }
+
+        .mariano-info p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .mariano-content {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .mariano-input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1rem;
+            color: var(--text-primary);
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .mariano-btn {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            width: 100%;
+            margin-top: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .mariano-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 102, 255, 0.4);
+        }
+
+        /* Notifications */
+        .notification {
+            position: fixed;
+            top: 100px;
+            right: 2rem;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            padding: 1rem 1.5rem;
+            color: white;
+            z-index: 10000;
+            transform: translateX(400px);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            max-width: 350px;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            border-left: 4px solid var(--success-color);
+        }
+
+        .notification.error {
+            border-left: 4px solid var(--error-color);
+        }
+
+        .notification.warning {
+            border-left: 4px solid var(--warning-color);
+        }
+
+        .notification.info {
+            border-left: 4px solid var(--primary-color);
+        }
+
+        /* Loading States */
+        .loading {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .container {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            
+            .sidebar {
+                position: static;
+                order: -1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .nav-tabs {
+                flex-wrap: wrap;
+            }
+            
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+            
+            .search-section {
+                flex-direction: column;
+            }
+            
+            .export-section {
+                flex-direction: column;
+            }
+        }
+
+        /* Utility Classes */
+        .hidden {
+            display: none !important;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .text-muted {
+            color: var(--text-muted);
+        }
+
+        .mb-1 { margin-bottom: 0.5rem; }
+        .mb-2 { margin-bottom: 1rem; }
+        .mb-3 { margin-bottom: 1.5rem; }
+        .mb-4 { margin-bottom: 2rem; }
+
+        .mt-1 { margin-top: 0.5rem; }
+        .mt-2 { margin-top: 1rem; }
+        .mt-3 { margin-top: 1.5rem; }
+        .mt-4 { margin-top: 2rem; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
         }
     </style>
 </head>
 <body>
-    <!-- Header -->
-    <div class="header">
-        <div class="logo">📋 JM TECNOLOGIA Use Cases</div>
-        <div class="user-info">
-            <span class="user-email" id="userEmail"></span>
-            <button class="btn-logout" onclick="fazerLogout()">🚪 Sair</button>
-        </div>
-    </div>
-
-    <!-- Login View -->
-    <div id="loginView" class="view">
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-screen">
         <div class="login-container">
-            <div class="login-card">
-                <h1 class="login-title">🔐 Login</h1>
-                <form onsubmit="event.preventDefault(); fazerLogin();">
-                    <div class="form-group">
-                        <label for="loginEmail">Email:</label>
-                        <input type="email" id="loginEmail" class="form-control" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="loginPassword">Senha:</label>
-                        <input type="password" id="loginPassword" class="form-control" required>
-                    </div>
-                    <button type="submit" class="btn-primary">Entrar</button>
-                </form>
+            <div class="login-logo">
+                <i class="fas fa-rocket"></i>
             </div>
+            <h2 class="login-title">JM TECNOLOGIA Use Cases</h2>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="loginEmail">Email</label>
+                    <input type="email" id="loginEmail" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Senha</label>
+                    <input type="password" id="loginPassword" class="form-control" required>
+                </div>
+                <button type="submit" class="btn-primary" id="loginBtn">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Entrar
+                </button>
+            </form>
         </div>
     </div>
 
-    <!-- Home View -->
-    <div id="homeView" class="view">
-        <div class="container">
-            <div class="home-header">
-                <h1 class="home-title">📋 Documentos</h1>
-                <div class="home-actions">
-                    <button class="btn btn-success" onclick="novoDocumento()">
-                        ➕ Iniciar Criação
-                    </button>
-                    <button class="btn btn-info" onclick="exportarDados('json')">
-                        📥 Exportar JSON
-                    </button>
-                    <button class="btn btn-info" onclick="exportarDados('csv')">
-                        📊 Exportar CSV
-                    </button>
+    <!-- Main Application -->
+    <div id="mainApp" class="hidden">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-rocket"></i>
+                    <h1>JM TECNOLOGIA Use Cases</h1>
+                </div>
+                <div class="status-indicator">
+                    <div class="connection-status">
+                        <div class="status-dot status-offline" id="statusDot"></div>
+                        <span id="statusText">Conectando...</span>
+                    </div>
+                    <div class="user-info">
+                        <span id="userEmail"></span>
+                        <button class="logout-btn" onclick="logout()">
+                            <i class="fas fa-sign-out-alt"></i>
+                            Sair
+                        </button>
+                    </div>
                 </div>
             </div>
+        </header>
 
-            <div class="search-container">
-                <input type="text" id="searchInput" class="search-input" placeholder="🔍 Buscar documentos..." onkeyup="buscarDocumentos()">
-            </div>
+        <!-- Main Container -->
+        <div class="container">
+            <!-- Main Content -->
+            <main class="main-content">
+                <!-- Navigation Tabs -->
+                <nav class="nav-tabs">
+                    <button class="nav-tab active" onclick="showSection('welcome')">
+                        <i class="fas fa-home"></i> Início
+                    </button>
+                    <button class="nav-tab" onclick="showSection('create')">
+                        <i class="fas fa-plus"></i> Criar
+                    </button>
+                    <button class="nav-tab" onclick="showSection('list')">
+                        <i class="fas fa-list"></i> Documentos
+                    </button>
+                </nav>
 
-            <div class="documentos-grid" id="documentosList">
-                <!-- Documentos serão carregados aqui -->
-            </div>
+                <!-- Welcome Section -->
+                <section id="welcomeSection" class="content-section active">
+                    <div class="welcome-section">
+                        <h2 class="welcome-title">Bem-vindo ao Sistema de Casos de Uso</h2>
+                        <p class="welcome-subtitle">Gerencie seus casos de uso de forma eficiente e organizada</p>
+                        <div class="action-buttons">
+                            <button class="btn" onclick="showSection('create')">
+                                <i class="fas fa-plus"></i>
+                                Iniciar Criação
+                            </button>
+                            <button class="btn btn-secondary" onclick="showSection('list')">
+                                <i class="fas fa-list"></i>
+                                Ver Documentos
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Create Section -->
+                <section id="createSection" class="content-section">
+                    <form id="documentForm">
+                        <!-- Basic Information -->
+                        <div class="form-section">
+                            <h3 class="section-title">
+                                <i class="fas fa-info-circle"></i>
+                                Informações Básicas
+                            </h3>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="codigo">Código (Automático)</label>
+                                    <input type="text" id="codigo" class="form-control" readonly>
+                                    <small class="text-muted">Código gerado automaticamente pelo sistema</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="titulo">Título *</label>
+                                    <input type="text" id="titulo" class="form-control" required>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="autor">Autor</label>
+                                    <input type="text" id="autor" class="form-control">
+                                </div>
+                                <div class="form-group">
+                                    <label for="responsavel">Responsável</label>
+                                    <input type="text" id="responsavel" class="form-control">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Description -->
+                        <div class="form-section">
+                            <h3 class="section-title">
+                                <i class="fas fa-align-left"></i>
+                                Descrição
+                            </h3>
+                            <div class="form-row full">
+                                <div class="form-group">
+                                    <label for="descricao">Descrição Detalhada</label>
+                                    <textarea id="descricao" class="form-control" rows="4"></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Problem and Solution -->
+                        <div class="form-section">
+                            <h3 class="section-title">
+                                <i class="fas fa-lightbulb"></i>
+                                Problema e Solução
+                            </h3>
+                            <div class="form-row full">
+                                <div class="form-group">
+                                    <label for="problema">Problema Identificado</label>
+                                    <textarea id="problema" class="form-control" rows="3"></textarea>
+                                </div>
+                            </div>
+                            <div class="form-row full">
+                                <div class="form-group">
+                                    <label for="solucao">Solução Proposta</label>
+                                    <textarea id="solucao" class="form-control" rows="3"></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- File Attachments -->
+                        <div class="form-section">
+                            <h3 class="section-title">
+                                <i class="fas fa-paperclip"></i>
+                                Anexos
+                            </h3>
+                            <div class="file-upload-area" id="fileUploadArea">
+                                <div class="file-upload-icon">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                </div>
+                                <div class="file-upload-text">
+                                    Arraste arquivos aqui ou clique para selecionar
+                                </div>
+                                <div class="text-muted">
+                                    Formatos suportados: PDF, DOC, DOCX, XLS, XLSX, PNG, JPG (máx. 10MB)
+                                </div>
+                                <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" style="display: none;">
+                            </div>
+                            <div id="fileList" class="file-list"></div>
+                        </div>
+
+                        <!-- Subtasks -->
+                        <div class="subtasks-section">
+                            <h3 class="section-title">
+                                <i class="fas fa-tasks"></i>
+                                Subtarefas
+                            </h3>
+                            <div id="subtasksList"></div>
+                            <button type="button" class="add-subtask-btn" onclick="addSubtask()">
+                                <i class="fas fa-plus"></i>
+                                Adicionar Subtarefa
+                            </button>
+                        </div>
+
+                        <!-- Form Actions -->
+                        <div class="form-section">
+                            <div class="action-buttons">
+                                <button type="submit" class="btn">
+                                    <i class="fas fa-save"></i>
+                                    Salvar Documento
+                                </button>
+                                <button type="button" class="btn btn-secondary" onclick="clearForm()">
+                                    <i class="fas fa-times"></i>
+                                    Limpar
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </section>
+
+                <!-- List Section -->
+                <section id="listSection" class="content-section">
+                    <!-- Search and Filters -->
+                    <div class="search-section">
+                        <input type="text" id="searchInput" class="form-control search-input" placeholder="Buscar documentos...">
+                        <select id="statusFilter" class="filter-select">
+                            <option value="">Todos os Status</option>
+                            <option value="ativo">Ativo</option>
+                            <option value="inativo">Inativo</option>
+                            <option value="concluido">Concluído</option>
+                        </select>
+                    </div>
+
+                    <!-- Export Options -->
+                    <div class="export-section">
+                        <button class="export-btn" onclick="exportToPDF()">
+                            <i class="fas fa-file-pdf"></i>
+                            Exportar PDF
+                        </button>
+                        <button class="export-btn" onclick="exportToExcel()">
+                            <i class="fas fa-file-excel"></i>
+                            Exportar Excel
+                        </button>
+                        <button class="export-btn" onclick="exportToWord()">
+                            <i class="fas fa-file-word"></i>
+                            Exportar Word
+                        </button>
+                        <button class="export-btn" onclick="exportToJSON()">
+                            <i class="fas fa-file-code"></i>
+                            Exportar JSON
+                        </button>
+                    </div>
+
+                    <!-- Document List -->
+                    <div id="documentsList" class="document-list">
+                        <!-- Documents will be loaded here -->
+                    </div>
+                </section>
+            </main>
+
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <!-- Mariano Assistant -->
+                <div class="mariano-container">
+                    <div class="mariano-header">
+                        <div class="mariano-avatar">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div class="mariano-info">
+                            <h3>Mariano</h3>
+                            <p>Assistente Inteligente</p>
+                        </div>
+                    </div>
+                    <div class="mariano-content">
+                        <p>Olá! Sou o Mariano, seu assistente para casos de uso. Como posso ajudar?</p>
+                    </div>
+                    <textarea id="marianoInput" class="mariano-input" placeholder="Digite sua pergunta..."></textarea>
+                    <button class="mariano-btn" onclick="askMariano()">
+                        <i class="fas fa-paper-plane"></i>
+                        Perguntar ao Mariano
+                    </button>
+                </div>
+
+                <!-- Quick Stats -->
+                <div class="mariano-container">
+                    <h3 class="section-title">
+                        <i class="fas fa-chart-bar"></i>
+                        Estatísticas
+                    </h3>
+                    <div id="quickStats">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
+                            <span>Total de Documentos:</span>
+                            <span id="totalDocs">0</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
+                            <span>Documentos Ativos:</span>
+                            <span id="activeDocs">0</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>Última Atualização:</span>
+                            <span id="lastUpdate">-</span>
+                        </div>
+                    </div>
+                </div>
+            </aside>
         </div>
     </div>
 
-    <!-- Form View -->
-    <div id="formView" class="view">
-        <div class="container">
-            <div class="form-container">
-                <h1 class="form-title">📝 Documento</h1>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+
+    <!-- External Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCNCheV1ezBEcilueuGuWM9FF4Pn8pBhXo",
+            authDomain: "jm-tecnologia-use-cases.firebaseapp.com",
+            projectId: "jm-tecnologia-use-cases",
+            storageBucket: "jm-tecnologia-use-cases.firebasestorage.app",
+            messagingSenderId: "1039370626796",
+            appId: "1:1039370626796:web:db89f13b918d377e6667c9",
+            measurementId: "G-EJQNDRXELH"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+        const storage = firebase.storage();
+
+        // Global Variables
+        let currentUser = null;
+        let documents = [];
+        let subtaskCounter = 0;
+        let uploadedFiles = [];
+
+        // Authentication State Observer
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                // Check if user is authorized
+                const isAuthorized = await checkUserAuthorization(user.email);
+                if (isAuthorized) {
+                    currentUser = user;
+                    document.getElementById('userEmail').textContent = user.email;
+                    document.getElementById('loginScreen').classList.add('hidden');
+                    document.getElementById('mainApp').classList.remove('hidden');
+                    updateConnectionStatus('online');
+                    loadDocuments();
+                    generateNextCode();
+                } else {
+                    showNotification('Usuário não autorizado', 'error');
+                    auth.signOut();
+                }
+            } else {
+                document.getElementById('loginScreen').classList.remove('hidden');
+                document.getElementById('mainApp').classList.add('hidden');
+                updateConnectionStatus('offline');
+            }
+        });
+
+        // Check User Authorization
+        async function checkUserAuthorization(email) {
+            try {
+                const snapshot = await db.collection('usuarios_autorizados')
+                    .where('email', '==', email)
+                    .where('ativo', '==', true)
+                    .get();
+                return !snapshot.empty;
+            } catch (error) {
+                console.error('Erro ao verificar autorização:', error);
+                return false;
+            }
+        }
+
+        // Login Function
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            const loginBtn = document.getElementById('loginBtn');
+
+            loginBtn.innerHTML = '<div class="spinner"></div> Entrando...';
+            loginBtn.disabled = true;
+
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+                showNotification('Login realizado com sucesso!', 'success');
+            } catch (error) {
+                showNotification('Erro no login: ' + error.message, 'error');
+                loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Entrar';
+                loginBtn.disabled = false;
+            }
+        });
+
+        // Logout Function
+        function logout() {
+            if (confirm('Deseja realmente sair do sistema?')) {
+                auth.signOut();
+                showNotification('Logout realizado com sucesso!', 'success');
+            }
+        }
+
+        // Update Connection Status
+        function updateConnectionStatus(status) {
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+
+            statusDot.className = 'status-dot';
+            
+            switch (status) {
+                case 'online':
+                    statusDot.classList.add('status-online');
+                    statusText.textContent = 'Firebase Online';
+                    break;
+                case 'connecting':
+                    statusDot.classList.add('status-connecting');
+                    statusText.textContent = 'Conectando...';
+                    break;
+                case 'offline':
+                    statusDot.classList.add('status-offline');
+                    statusText.textContent = 'Firebase Offline';
+                    break;
+            }
+        }
+
+        // Show Notification
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            
+            const icon = type === 'success' ? 'check-circle' : 
+                        type === 'error' ? 'exclamation-circle' : 
+                        type === 'warning' ? 'exclamation-triangle' : 'info-circle';
+            
+            notification.innerHTML = `
+                <i class="fas fa-${icon}"></i>
+                <span>${message}</span>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => notification.classList.add('show'), 100);
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => document.body.removeChild(notification), 300);
+            }, 3000);
+        }
+
+        // Navigation Functions
+        function showSection(sectionName) {
+            // Update nav tabs
+            document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Update content sections
+            document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
+            document.getElementById(sectionName + 'Section').classList.add('active');
+
+            // Special actions for each section
+            if (sectionName === 'create') {
+                generateNextCode();
+            } else if (sectionName === 'list') {
+                loadDocuments();
+            }
+        }
+
+        // Generate Next Code
+        async function generateNextCode() {
+            try {
+                updateConnectionStatus('connecting');
+                showNotification('Gerando código automático...', 'info');
+
+                const counterRef = db.collection('counters').doc('documentos');
                 
-                <div class="codigo-info">
-                    <strong>ℹ️ Numeração Automática:</strong> O código será gerado automaticamente pelo sistema (UC-001, UC-002, etc.)
+                await db.runTransaction(async (transaction) => {
+                    const counterDoc = await transaction.get(counterRef);
+                    
+                    let nextNumber = 1;
+                    if (counterDoc.exists) {
+                        nextNumber = (counterDoc.data().count || 0) + 1;
+                    }
+                    
+                    transaction.set(counterRef, { count: nextNumber }, { merge: true });
+                    
+                    const code = `UC-${String(nextNumber).padStart(3, '0')}`;
+                    document.getElementById('codigo').value = code;
+                });
+
+                updateConnectionStatus('online');
+            } catch (error) {
+                console.error('Erro ao gerar código:', error);
+                showNotification('Erro ao gerar código automático', 'error');
+                updateConnectionStatus('offline');
+            }
+        }
+
+        // File Upload Functions
+        function initFileUpload() {
+            const fileUploadArea = document.getElementById('fileUploadArea');
+            const fileInput = document.getElementById('fileInput');
+
+            fileUploadArea.addEventListener('click', () => fileInput.click());
+            fileUploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                fileUploadArea.classList.add('dragover');
+            });
+            fileUploadArea.addEventListener('dragleave', () => {
+                fileUploadArea.classList.remove('dragover');
+            });
+            fileUploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                fileUploadArea.classList.remove('dragover');
+                handleFiles(e.dataTransfer.files);
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                handleFiles(e.target.files);
+            });
+        }
+
+        function handleFiles(files) {
+            Array.from(files).forEach(file => {
+                if (file.size > 10 * 1024 * 1024) { // 10MB limit
+                    showNotification(`Arquivo ${file.name} é muito grande (máx. 10MB)`, 'warning');
+                    return;
+                }
+
+                uploadedFiles.push(file);
+                addFileToList(file);
+            });
+        }
+
+        function addFileToList(file) {
+            const fileList = document.getElementById('fileList');
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-item';
+            fileItem.innerHTML = `
+                <div class="file-info">
+                    <i class="fas fa-file"></i>
+                    <span>${file.name}</span>
+                    <small class="text-muted">(${(file.size / 1024).toFixed(1)} KB)</small>
                 </div>
+                <button type="button" class="file-remove" onclick="removeFile('${file.name}')">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            fileList.appendChild(fileItem);
+        }
 
-                <form id="documentForm" onsubmit="event.preventDefault(); salvarDocumento();">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="codigo">Código:</label>
-                            <input type="text" id="codigo" class="form-control" readonly>
-                        </div>
-                        <div class="form-group">
-                            <label for="titulo">Título: *</label>
-                            <input type="text" id="titulo" class="form-control" required>
-                        </div>
-                    </div>
+        function removeFile(fileName) {
+            uploadedFiles = uploadedFiles.filter(file => file.name !== fileName);
+            const fileList = document.getElementById('fileList');
+            const fileItems = fileList.querySelectorAll('.file-item');
+            fileItems.forEach(item => {
+                if (item.textContent.includes(fileName)) {
+                    fileList.removeChild(item);
+                }
+            });
+        }
 
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="autor">Autor:</label>
-                            <input type="text" id="autor" class="form-control">
-                        </div>
-                        <div class="form-group">
-                            <label for="responsavel">Responsável:</label>
-                            <input type="text" id="responsavel" class="form-control">
-                        </div>
-                    </div>
+        // Subtask Functions
+        function addSubtask() {
+            const parentCode = document.getElementById('codigo').value;
+            if (!parentCode) {
+                showNotification('Gere um código primeiro', 'warning');
+                return;
+            }
 
+            subtaskCounter++;
+            const subtaskCode = `${parentCode}.${subtaskCounter}`;
+            
+            const subtasksList = document.getElementById('subtasksList');
+            const subtaskItem = document.createElement('div');
+            subtaskItem.className = 'subtask-item';
+            subtaskItem.innerHTML = `
+                <div class="subtask-header">
+                    <span class="subtask-code">${subtaskCode}</span>
+                    <button type="button" class="subtask-remove" onclick="removeSubtask(this)">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="form-row">
                     <div class="form-group">
-                        <label for="descricao">Descrição:</label>
-                        <textarea id="descricao" class="form-control"></textarea>
+                        <label>Título da Subtarefa</label>
+                        <input type="text" class="form-control subtask-title" placeholder="Digite o título da subtarefa">
                     </div>
-
+                </div>
+                <div class="form-row full">
                     <div class="form-group">
-                        <label for="problema">Problema:</label>
-                        <textarea id="problema" class="form-control"></textarea>
+                        <label>Descrição da Subtarefa</label>
+                        <textarea class="form-control subtask-description" rows="2" placeholder="Descreva a subtarefa"></textarea>
                     </div>
+                </div>
+            `;
+            subtasksList.appendChild(subtaskItem);
+        }
 
-                    <div class="form-group">
-                        <label for="solucao">Solução:</label>
-                        <textarea id="solucao" class="form-control"></textarea>
-                    </div>
+        function removeSubtask(button) {
+            const subtaskItem = button.closest('.subtask-item');
+            subtaskItem.remove();
+            
+            // Renumber remaining subtasks
+            const remainingSubtasks = document.querySelectorAll('.subtask-code');
+            const parentCode = document.getElementById('codigo').value;
+            remainingSubtasks.forEach((codeElement, index) => {
+                codeElement.textContent = `${parentCode}.${index + 1}`;
+            });
+            subtaskCounter = remainingSubtasks.length;
+        }
 
-                    <!-- Seção de Anexos -->
-                    <div class="anexos-section">
-                        <label>📎 Anexos:</label>
-                        <div class="drop-zone" id="dropZone">
-                            <div class="drop-zone-text">📁 Arraste arquivos aqui ou clique para selecionar</div>
-                            <div class="drop-zone-subtext">Máximo 10MB por arquivo • PDF, Imagens, Word, Excel</div>
-                        </div>
-                        <input type="file" id="anexos" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif">
-                        
-                        <div id="anexosExistentes" class="anexos-existentes">
-                            <h4>Anexos Existentes:</h4>
-                            <!-- Anexos existentes serão mostrados aqui -->
-                        </div>
-                    </div>
+        // Document Form Functions
+        document.getElementById('documentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await saveDocument();
+        });
 
-                    <div class="form-actions">
-                        <button type="button" class="btn btn-secondary" onclick="showView('home')">
-                            ❌ Cancelar
+        async function saveDocument() {
+            try {
+                updateConnectionStatus('connecting');
+                showNotification('Salvando documento...', 'info');
+
+                const formData = {
+                    codigo: document.getElementById('codigo').value,
+                    titulo: document.getElementById('titulo').value,
+                    autor: document.getElementById('autor').value,
+                    responsavel: document.getElementById('responsavel').value,
+                    descricao: document.getElementById('descricao').value,
+                    problema: document.getElementById('problema').value,
+                    solucao: document.getElementById('solucao').value,
+                    dataCriacao: firebase.firestore.Timestamp.now(),
+                    dataModificacao: firebase.firestore.Timestamp.now(),
+                    status: 'ativo',
+                    autorEmail: currentUser.email
+                };
+
+                // Upload files to Firebase Storage
+                const fileUrls = [];
+                for (const file of uploadedFiles) {
+                    const fileRef = storage.ref(`documentos/${formData.codigo}/${file.name}`);
+                    await fileRef.put(file);
+                    const downloadURL = await fileRef.getDownloadURL();
+                    fileUrls.push({
+                        name: file.name,
+                        url: downloadURL,
+                        size: file.size,
+                        type: file.type
+                    });
+                }
+                formData.anexos = fileUrls;
+
+                // Collect subtasks
+                const subtasks = [];
+                const subtaskItems = document.querySelectorAll('.subtask-item');
+                subtaskItems.forEach((item, index) => {
+                    const title = item.querySelector('.subtask-title').value;
+                    const description = item.querySelector('.subtask-description').value;
+                    if (title) {
+                        subtasks.push({
+                            codigo: `${formData.codigo}.${index + 1}`,
+                            titulo: title,
+                            descricao: description,
+                            parentId: formData.codigo
+                        });
+                    }
+                });
+
+                // Save main document
+                await db.collection('documentos').add(formData);
+
+                // Save subtasks
+                for (const subtask of subtasks) {
+                    await db.collection('subtarefas').add({
+                        ...subtask,
+                        dataCriacao: firebase.firestore.Timestamp.now(),
+                        dataModificacao: firebase.firestore.Timestamp.now(),
+                        status: 'ativo',
+                        autorEmail: currentUser.email
+                    });
+                }
+
+                showNotification('Documento salvo com sucesso!', 'success');
+                clearForm();
+                showSection('list');
+                updateConnectionStatus('online');
+
+            } catch (error) {
+                console.error('Erro ao salvar documento:', error);
+                showNotification('Erro ao salvar documento: ' + error.message, 'error');
+                updateConnectionStatus('offline');
+            }
+        }
+
+        function clearForm() {
+            document.getElementById('documentForm').reset();
+            document.getElementById('subtasksList').innerHTML = '';
+            document.getElementById('fileList').innerHTML = '';
+            uploadedFiles = [];
+            subtaskCounter = 0;
+            generateNextCode();
+        }
+
+        // Load Documents
+        async function loadDocuments() {
+            try {
+                updateConnectionStatus('connecting');
+                showNotification('Carregando documentos...', 'info');
+
+                const snapshot = await db.collection('documentos')
+                    .orderBy('dataCriacao', 'desc')
+                    .get();
+
+                documents = [];
+                snapshot.forEach(doc => {
+                    documents.push({ id: doc.id, ...doc.data() });
+                });
+
+                displayDocuments(documents);
+                updateStats();
+                updateConnectionStatus('online');
+
+            } catch (error) {
+                console.error('Erro ao carregar documentos:', error);
+                showNotification('Erro ao carregar documentos', 'error');
+                updateConnectionStatus('offline');
+            }
+        }
+
+        function displayDocuments(docs) {
+            const documentsList = document.getElementById('documentsList');
+            
+            if (docs.length === 0) {
+                documentsList.innerHTML = `
+                    <div class="text-center" style="padding: 3rem;">
+                        <i class="fas fa-file-alt" style="font-size: 3rem; color: var(--text-muted); margin-bottom: 1rem;"></i>
+                        <h3 style="color: var(--text-muted);">Nenhum documento encontrado</h3>
+                        <p style="color: var(--text-muted);">Comece criando seu primeiro caso de uso</p>
+                        <button class="btn" onclick="showSection('create')">
+                            <i class="fas fa-plus"></i>
+                            Criar Primeiro Documento
                         </button>
-                        <button type="submit" class="btn btn-success">
-                            💾 Salvar
-                        </button>
                     </div>
-                </form>
-            </div>
-        </div>
-    </div>
+                `;
+                return;
+            }
+
+            documentsList.innerHTML = docs.map(doc => `
+                <div class="document-item">
+                    <div class="document-header">
+                        <span class="document-code">${doc.codigo}</span>
+                        <div class="document-actions">
+                            <button class="action-btn" onclick="editDocument('${doc.id}')" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="action-btn" onclick="duplicateDocument('${doc.id}')" title="Duplicar">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                            <button class="action-btn" onclick="deleteDocument('${doc.id}')" title="Excluir">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <h4 class="document-title">${doc.titulo}</h4>
+                    <div class="document-meta">
+                        <span><i class="fas fa-user"></i> ${doc.autor || 'N/A'}</span>
+                        <span><i class="fas fa-calendar"></i> ${formatDate(doc.dataCriacao)}</span>
+                        <span><i class="fas fa-paperclip"></i> ${doc.anexos ? doc.anexos.length : 0} anexos</span>
+                    </div>
+                    <p class="document-description">${doc.descricao || 'Sem descrição'}</p>
+                </div>
+            `).join('');
+        }
+
+        function formatDate(timestamp) {
+            if (!timestamp) return 'N/A';
+            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            return date.toLocaleDateString('pt-BR');
+        }
+
+        function updateStats() {
+            document.getElementById('totalDocs').textContent = documents.length;
+            document.getElementById('activeDocs').textContent = documents.filter(doc => doc.status === 'ativo').length;
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('pt-BR');
+        }
+
+        // Document Actions
+        async function editDocument(docId) {
+            try {
+                const doc = await db.collection('documentos').doc(docId).get();
+                if (doc.exists) {
+                    const data = doc.data();
+                    
+                    // Fill form with document data
+                    document.getElementById('codigo').value = data.codigo;
+                    document.getElementById('titulo').value = data.titulo || '';
+                    document.getElementById('autor').value = data.autor || '';
+                    document.getElementById('responsavel').value = data.responsavel || '';
+                    document.getElementById('descricao').value = data.descricao || '';
+                    document.getElementById('problema').value = data.problema || '';
+                    document.getElementById('solucao').value = data.solucao || '';
+                    
+                    // Load subtasks
+                    const subtasksSnapshot = await db.collection('subtarefas')
+                        .where('parentId', '==', data.codigo)
+                        .get();
+                    
+                    document.getElementById('subtasksList').innerHTML = '';
+                    subtaskCounter = 0;
+                    
+                    subtasksSnapshot.forEach(subtaskDoc => {
+                        const subtaskData = subtaskDoc.data();
+                        addSubtaskWithData(subtaskData.codigo, subtaskData.titulo, subtaskData.descricao);
+                    });
+                    
+                    showSection('create');
+                    showNotification('Documento carregado para edição', 'info');
+                }
+            } catch (error) {
+                console.error('Erro ao carregar documento:', error);
+                showNotification('Erro ao carregar documento', 'error');
+            }
+        }
+
+        function addSubtaskWithData(code, title, description) {
+            subtaskCounter++;
+            const subtasksList = document.getElementById('subtasksList');
+            const subtaskItem = document.createElement('div');
+            subtaskItem.className = 'subtask-item';
+            subtaskItem.innerHTML = `
+                <div class="subtask-header">
+                    <span class="subtask-code">${code}</span>
+                    <button type="button" class="subtask-remove" onclick="removeSubtask(this)">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Título da Subtarefa</label>
+                        <input type="text" class="form-control subtask-title" value="${title}" placeholder="Digite o título da subtarefa">
+                    </div>
+                </div>
+                <div class="form-row full">
+                    <div class="form-group">
+                        <label>Descrição da Subtarefa</label>
+                        <textarea class="form-control subtask-description" rows="2" placeholder="Descreva a subtarefa">${description}</textarea>
+                    </div>
+                </div>
+            `;
+            subtasksList.appendChild(subtaskItem);
+        }
+
+        async function duplicateDocument(docId) {
+            try {
+                const doc = await db.collection('documentos').doc(docId).get();
+                if (doc.exists) {
+                    const data = doc.data();
+                    
+                    // Generate new code
+                    await generateNextCode();
+                    const newCode = document.getElementById('codigo').value;
+                    
+                    // Fill form with duplicated data
+                    document.getElementById('titulo').value = data.titulo + ' (Cópia)';
+                    document.getElementById('autor').value = data.autor || '';
+                    document.getElementById('responsavel').value = data.responsavel || '';
+                    document.getElementById('descricao').value = data.descricao || '';
+                    document.getElementById('problema').value = data.problema || '';
+                    document.getElementById('solucao').value = data.solucao || '';
+                    
+                    showSection('create');
+                    showNotification('Documento duplicado. Altere os dados e salve.', 'info');
+                }
+            } catch (error) {
+                console.error('Erro ao duplicar documento:', error);
+                showNotification('Erro ao duplicar documento', 'error');
+            }
+        }
+
+        async function deleteDocument(docId) {
+            const password = prompt('Digite a senha para excluir o documento:');
+            if (!password) return;
+            
+            // Check password
+            if (!password.startsWith('josimar') && password !== '*Josimar****@@@@' && password !== 'josimar1') {
+                showNotification('Senha incorreta', 'error');
+                return;
+            }
+            
+            if (!confirm('Tem certeza que deseja excluir este documento? Esta ação não pode ser desfeita.')) {
+                return;
+            }
+            
+            try {
+                await db.collection('documentos').doc(docId).delete();
+                showNotification('Documento excluído com sucesso', 'success');
+                loadDocuments();
+            } catch (error) {
+                console.error('Erro ao excluir documento:', error);
+                showNotification('Erro ao excluir documento', 'error');
+            }
+        }
+
+        // Search and Filter Functions
+        document.getElementById('searchInput').addEventListener('input', filterDocuments);
+        document.getElementById('statusFilter').addEventListener('change', filterDocuments);
+
+        function filterDocuments() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+            
+            let filteredDocs = documents.filter(doc => {
+                const matchesSearch = !searchTerm || 
+                    doc.titulo.toLowerCase().includes(searchTerm) ||
+                    doc.codigo.toLowerCase().includes(searchTerm) ||
+                    (doc.autor && doc.autor.toLowerCase().includes(searchTerm)) ||
+                    (doc.descricao && doc.descricao.toLowerCase().includes(searchTerm));
+                
+                const matchesStatus = !statusFilter || doc.status === statusFilter;
+                
+                return matchesSearch && matchesStatus;
+            });
+            
+            displayDocuments(filteredDocs);
+        }
+
+        // Export Functions
+        function exportToPDF() {
+            try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                doc.setFontSize(20);
+                doc.text('JM TECNOLOGIA - Casos de Uso', 20, 30);
+                
+                let yPosition = 50;
+                documents.forEach((document, index) => {
+                    if (yPosition > 250) {
+                        doc.addPage();
+                        yPosition = 30;
+                    }
+                    
+                    doc.setFontSize(14);
+                    doc.text(`${document.codigo} - ${document.titulo}`, 20, yPosition);
+                    yPosition += 10;
+                    
+                    doc.setFontSize(10);
+                    doc.text(`Autor: ${document.autor || 'N/A'}`, 20, yPosition);
+                    yPosition += 7;
+                    
+                    if (document.descricao) {
+                        const lines = doc.splitTextToSize(document.descricao, 170);
+                        doc.text(lines, 20, yPosition);
+                        yPosition += lines.length * 5;
+                    }
+                    
+                    yPosition += 10;
+                });
+                
+                doc.save('casos-de-uso.pdf');
+                showNotification('PDF exportado com sucesso!', 'success');
+            } catch (error) {
+                console.error('Erro ao exportar PDF:', error);
+                showNotification('Erro ao exportar PDF', 'error');
+            }
+        }
+
+        function exportToExcel() {
+            try {
+                const ws = XLSX.utils.json_to_sheet(documents.map(doc => ({
+                    'Código': doc.codigo,
+                    'Título': doc.titulo,
+                    'Autor': doc.autor || '',
+                    'Responsável': doc.responsavel || '',
+                    'Descrição': doc.descricao || '',
+                    'Problema': doc.problema || '',
+                    'Solução': doc.solucao || '',
+                    'Status': doc.status || '',
+                    'Data Criação': formatDate(doc.dataCriacao)
+                })));
+                
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Casos de Uso');
+                XLSX.writeFile(wb, 'casos-de-uso.xlsx');
+                
+                showNotification('Excel exportado com sucesso!', 'success');
+            } catch (error) {
+                console.error('Erro ao exportar Excel:', error);
+                showNotification('Erro ao exportar Excel', 'error');
+            }
+        }
+
+        function exportToWord() {
+            try {
+                let content = `
+                    <html>
+                    <head>
+                        <meta charset="utf-8">
+                        <title>JM TECNOLOGIA - Casos de Uso</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; margin: 40px; }
+                            h1 { color: #0066ff; border-bottom: 2px solid #0066ff; padding-bottom: 10px; }
+                            .document { margin-bottom: 30px; padding: 20px; border: 1px solid #ddd; }
+                            .code { background: #0066ff; color: white; padding: 5px 10px; border-radius: 5px; display: inline-block; }
+                            .meta { color: #666; font-size: 0.9em; margin: 10px 0; }
+                        </style>
+                    </head>
+                    <body>
+                        <h1>JM TECNOLOGIA - Casos de Uso</h1>
+                `;
+                
+                documents.forEach(doc => {
+                    content += `
+                        <div class="document">
+                            <span class="code">${doc.codigo}</span>
+                            <h2>${doc.titulo}</h2>
+                            <div class="meta">
+                                <strong>Autor:</strong> ${doc.autor || 'N/A'} | 
+                                <strong>Data:</strong> ${formatDate(doc.dataCriacao)}
+                            </div>
+                            <p><strong>Descrição:</strong> ${doc.descricao || 'N/A'}</p>
+                            ${doc.problema ? `<p><strong>Problema:</strong> ${doc.problema}</p>` : ''}
+                            ${doc.solucao ? `<p><strong>Solução:</strong> ${doc.solucao}</p>` : ''}
+                        </div>
+                    `;
+                });
+                
+                content += '</body></html>';
+                
+                const blob = new Blob([content], { type: 'application/msword' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'casos-de-uso.doc';
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                showNotification('Word exportado com sucesso!', 'success');
+            } catch (error) {
+                console.error('Erro ao exportar Word:', error);
+                showNotification('Erro ao exportar Word', 'error');
+            }
+        }
+
+        function exportToJSON() {
+            try {
+                const dataStr = JSON.stringify(documents, null, 2);
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'casos-de-uso.json';
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                showNotification('JSON exportado com sucesso!', 'success');
+            } catch (error) {
+                console.error('Erro ao exportar JSON:', error);
+                showNotification('Erro ao exportar JSON', 'error');
+            }
+        }
+
+        // Mariano Assistant
+        function askMariano() {
+            const question = document.getElementById('marianoInput').value.trim();
+            if (!question) {
+                showNotification('Digite uma pergunta para o Mariano', 'warning');
+                return;
+            }
+            
+            const marianoContent = document.querySelector('.mariano-content p');
+            marianoContent.innerHTML = '<div class="loading"><div class="spinner"></div> Mariano está pensando...</div>';
+            
+            setTimeout(() => {
+                const response = getMarianoResponse(question);
+                marianoContent.innerHTML = response;
+                document.getElementById('marianoInput').value = '';
+            }, 1500);
+        }
+
+        function getMarianoResponse(question) {
+            const q = question.toLowerCase();
+            
+            if (q.includes('como') && (q.includes('criar') || q.includes('novo'))) {
+                return 'Para criar um novo caso de uso, clique em "Criar" no menu superior. O sistema gerará automaticamente um código único (UC-XXX). Preencha os campos obrigatórios como título e descrição. Você também pode adicionar subtarefas e anexos!';
+            }
+            
+            if (q.includes('código') || q.includes('numeração')) {
+                return 'O sistema gera códigos automaticamente no formato UC-001, UC-002, etc. Cada documento recebe um número único e sequencial. As subtarefas seguem o padrão UC-001.1, UC-001.2, garantindo organização hierárquica.';
+            }
+            
+            if (q.includes('anexo') || q.includes('arquivo')) {
+                return 'Você pode anexar arquivos arrastando-os para a área de upload ou clicando para selecionar. Formatos suportados: PDF, DOC, DOCX, XLS, XLSX, PNG, JPG. Limite máximo de 10MB por arquivo. Os arquivos são salvos no Firebase Storage.';
+            }
+            
+            if (q.includes('subtarefa') || q.includes('sub')) {
+                return 'As subtarefas permitem dividir um caso de uso em partes menores. Clique em "Adicionar Subtarefa" no formulário. Cada subtarefa recebe numeração automática (UC-001.1, UC-001.2) e pode ter título e descrição próprios.';
+            }
+            
+            if (q.includes('exportar') || q.includes('export')) {
+                return 'Você pode exportar seus documentos em 4 formatos: PDF (para visualização), Excel (para análise), Word (para edição) e JSON (para backup). Use os botões de exportação na seção "Documentos".';
+            }
+            
+            if (q.includes('buscar') || q.includes('pesquisar') || q.includes('filtro')) {
+                return 'Use a barra de pesquisa para encontrar documentos por título, código, autor ou descrição. Você também pode filtrar por status (Ativo, Inativo, Concluído) usando o seletor ao lado da busca.';
+            }
+            
+            if (q.includes('excluir') || q.includes('deletar')) {
+                return 'Para excluir um documento, clique no ícone de lixeira na lista. Será solicitada uma senha de segurança. Senhas válidas começam com "josimar". ATENÇÃO: A exclusão é permanente e não pode ser desfeita!';
+            }
+            
+            if (q.includes('login') || q.includes('acesso')) {
+                return 'O sistema possui controle de acesso. Apenas usuários autorizados podem fazer login. Os emails autorizados são gerenciados no Firebase. Entre em contato com o administrador para solicitar acesso.';
+            }
+            
+            if (q.includes('problema') || q.includes('erro')) {
+                return 'Se encontrar problemas: 1) Verifique sua conexão (indicador no topo); 2) Recarregue a página; 3) Verifique se está logado; 4) Contate o suporte técnico. O sistema salva automaticamente no Firebase.';
+            }
+            
+            return 'Olá! Sou o Mariano, seu assistente para casos de uso. Posso ajudar com: criação de documentos, numeração automática, subtarefas, anexos, exportação, busca e filtros. Faça uma pergunta específica sobre qualquer funcionalidade!';
+        }
+
+        // Initialize Application
+        document.addEventListener('DOMContentLoaded', function() {
+            initFileUpload();
+            updateConnectionStatus('connecting');
+            
+            // Test Firebase connection
+            db.collection('test').limit(1).get()
+                .then(() => {
+                    showNotification('Conectado ao Firebase com sucesso!', 'success');
+                })
+                .catch((error) => {
+                    console.error('Erro de conexão:', error);
+                    showNotification('Erro de conexão com Firebase', 'error');
+                });
+        });
+    </script>
 </body>
 </html>
 
