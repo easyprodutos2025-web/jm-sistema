@@ -6,41 +6,6 @@
     <title>JM TECNOLOGIA Use Cases</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-        import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc, runTransaction, setDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
-        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
-        import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
-
-        // Configuração do Firebase
-        const firebaseConfig = {
-            apiKey: "AIzaSyCNCheV1ezBEcilueuGuWM9FF4Pn8pBhXo",
-            authDomain: "jm-tecnologia-use-cases.firebaseapp.com",
-            projectId: "jm-tecnologia-use-cases",
-            storageBucket: "jm-tecnologia-use-cases.firebasestorage.app",
-            messagingSenderId: "1039370626796",
-            appId: "1:1039370626796:web:db89f13b918d377e6667c9",
-            measurementId: "G-EJQNDRXELH"
-        };
-
-        // Inicializar Firebase
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-        const storage = getStorage(app);
-
-        // Disponibilizar globalmente
-        window.db = db;
-        window.auth = auth;
-        window.storage = storage;
-        window.firebaseModules = {
-            collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc, runTransaction, setDoc,
-            signInWithEmailAndPassword, signOut, onAuthStateChanged,
-            ref, uploadBytes, getDownloadURL, deleteObject
-        };
-    </script>
-
     <!-- Google AI SDK -->
     <script type="importmap">
         {
@@ -49,11 +14,6 @@
             }
         }
     </script>
-
-    <!-- External Libraries -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/7.1.0/docx.min.js"></script>
 
     <style>
         :root {
@@ -96,50 +56,57 @@
             width: 100%;
             height: 100%;
             background: 
-                radial-gradient(circle at 20% 80%, rgba(0, 102, 255, 0.1) 0%, transparent 50%),
-                radial-gradient(circle at 80% 20%, rgba(0, 204, 255, 0.1) 0%, transparent 50%),
-                radial-gradient(circle at 40% 40%, rgba(255, 107, 53, 0.1) 0%, transparent 50%);
+                radial-gradient(circle at 20% 80%, rgba(0, 102, 255, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(0, 204, 255, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(255, 107, 53, 0.05) 0%, transparent 50%);
             z-index: -1;
-            animation: backgroundMove 20s ease-in-out infinite;
+            animation: backgroundShift 20s ease-in-out infinite;
         }
 
-        @keyframes backgroundMove {
+        @keyframes backgroundShift {
             0%, 100% { transform: translateX(0) translateY(0); }
-            33% { transform: translateX(-20px) translateY(-20px); }
-            66% { transform: translateX(20px) translateY(-10px); }
+            25% { transform: translateX(-20px) translateY(-20px); }
+            50% { transform: translateX(20px) translateY(-20px); }
+            75% { transform: translateX(-20px) translateY(20px); }
         }
 
         /* Header */
         .header {
-            background: rgba(255, 255, 255, 0.05);
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
             backdrop-filter: blur(20px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            border-bottom: 1px solid var(--border-color);
             padding: 1rem 2rem;
             position: sticky;
             top: 0;
             z-index: 1000;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         }
 
         .header-content {
-            max-width: 1400px;
-            margin: 0 auto;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            max-width: 1400px;
+            margin: 0 auto;
         }
 
         .logo {
             display: flex;
             align-items: center;
             gap: 1rem;
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--primary-color);
         }
 
         .logo i {
             font-size: 2rem;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .logo h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
             background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -157,12 +124,12 @@
             align-items: center;
             gap: 0.5rem;
             padding: 0.5rem 1rem;
-            border-radius: 20px;
             background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
             font-size: 0.9rem;
         }
 
-        .status-indicator {
+        .status-dot {
             width: 8px;
             height: 8px;
             border-radius: 50%;
@@ -178,144 +145,33 @@
             50% { opacity: 0.5; }
         }
 
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .logout-btn {
-            background: linear-gradient(135deg, var(--error-color), #ff6b6b);
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.3s ease;
-        }
-
-        .logout-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(255, 71, 87, 0.4);
-        }
-
-        /* Login Screen */
-        .login-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
-        }
-
-        .login-container {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            padding: 3rem;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-            width: 100%;
-            max-width: 400px;
-            text-align: center;
-        }
-
-        .login-title {
-            font-size: 2rem;
-            margin-bottom: 2rem;
-            color: var(--text-primary);
-        }
-
-        .form-group {
-            margin-bottom: 1.5rem;
-            text-align: left;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: var(--text-secondary);
-            font-weight: 600;
-        }
-
-        .form-control {
-            width: 100%;
-            padding: 1rem;
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.1);
-            color: var(--text-primary);
-            font-size: 1rem;
-            transition: all 0.3s ease;
-        }
-
-        .form-control:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 20px rgba(0, 102, 255, 0.3);
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: white;
-            border: none;
-            padding: 1rem 2rem;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 1rem;
-            font-weight: 600;
-            width: 100%;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(0, 102, 255, 0.4);
-        }
-
-        .btn-primary:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
         /* Main Container */
         .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 2rem;
             display: grid;
             grid-template-columns: 1fr 350px;
             gap: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
             min-height: calc(100vh - 100px);
         }
 
         .main-content {
             background: rgba(255, 255, 255, 0.05);
             backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--border-color);
             border-radius: 20px;
             padding: 2rem;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
 
         .sidebar {
             background: rgba(255, 255, 255, 0.05);
             backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--border-color);
             border-radius: 20px;
             padding: 2rem;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
             height: fit-content;
             position: sticky;
             top: 120px;
@@ -391,6 +247,17 @@
             gap: 0.5rem;
         }
 
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
         .form-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -402,9 +269,46 @@
             grid-template-columns: 1fr;
         }
 
+        .form-control {
+            width: 100%;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 20px var(--shadow-color);
+        }
+
         textarea.form-control {
             min-height: 120px;
             resize: vertical;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px var(--shadow-color);
         }
 
         .btn-secondary {
@@ -456,7 +360,7 @@
 
         .subtask-header {
             display: flex;
-            justify-content: between;
+            justify-content: space-between;
             align-items: center;
             margin-bottom: 0.5rem;
         }
@@ -919,266 +823,305 @@
             display: none !important;
         }
     </style>
+
+    <!-- External Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/7.1.0/docx.min.js"></script>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc, runTransaction, setDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
+
+        // Configuração do Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyCNCheV1ezBEcilueuGuWM9FF4Pn8pBhXo",
+            authDomain: "jm-tecnologia-use-cases.firebaseapp.com",
+            projectId: "jm-tecnologia-use-cases",
+            storageBucket: "jm-tecnologia-use-cases.firebasestorage.app",
+            messagingSenderId: "1039370626796",
+            appId: "1:1039370626796:web:db89f13b918d377e6667c9",
+            measurementId: "G-EJQNDRXELH"
+        };
+
+        // Inicializar Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const storage = getStorage(app);
+
+        // Disponibilizar globalmente
+        window.db = db;
+        window.auth = auth;
+        window.storage = storage;
+        window.firebaseModules = {
+            collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc, runTransaction, setDoc,
+            signInWithEmailAndPassword, signOut, onAuthStateChanged,
+            ref, uploadBytes, getDownloadURL, deleteObject
+        };
+
+        // Testar conexão
+        window.addEventListener('load', async () => {
+            try {
+                await getDocs(collection(db, 'documentos'));
+                updateConnectionStatus('online');
+                showNotification('🔥 Sistema JM TECNOLOGIA online e conectado!', 'success');
+                
+                // Inicializar contadores se não existirem
+                await initializeCounters();
+                
+                if (window.location.hash === '#list') {
+                    loadDocuments();
+                }
+            } catch (error) {
+                console.error('Erro de conexão:', error);
+                updateConnectionStatus('offline');
+                showNotification('Erro de conexão com Firebase', 'error');
+            }
+        });
+
+        // Inicializar contadores
+        async function initializeCounters() {
+            try {
+                const counterRef = doc(db, 'counters', 'documentos');
+                const counterDoc = await getDoc(counterRef);
+                
+                if (!counterDoc.exists()) {
+                    await setDoc(counterRef, { count: 0 });
+                }
+            } catch (error) {
+                console.error('Erro ao inicializar contadores:', error);
+            }
+        }
+    </script>
 </head>
 <body>
-    <!-- Login Screen -->
-    <div id="loginScreen" class="login-screen">
-        <div class="login-container">
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
             <div class="logo">
                 <i class="fas fa-clipboard-list"></i>
-                <span>JM TECNOLOGIA</span>
+                <h1>JM TECNOLOGIA</h1>
             </div>
-            <h2 class="login-title">Acesso ao Sistema</h2>
-            <form id="loginForm">
-                <div class="form-group">
-                    <label for="loginEmail">Email</label>
-                    <input type="email" id="loginEmail" class="form-control" required>
+            <div class="header-actions">
+                <div class="connection-status">
+                    <div class="status-dot" id="statusDot"></div>
+                    <span id="statusText">Conectando...</span>
                 </div>
-                <div class="form-group">
-                    <label for="loginPassword">Senha</label>
-                    <input type="password" id="loginPassword" class="form-control" required>
-                </div>
-                <button type="submit" class="btn-primary" id="loginBtn">
-                    <i class="fas fa-sign-in-alt"></i>
-                    Entrar
-                </button>
-            </form>
+            </div>
         </div>
-    </div>
+    </header>
 
-    <!-- Main Application -->
-    <div id="mainApp" class="hidden">
-        <!-- Header -->
-        <header class="header">
-            <div class="header-content">
-                <div class="logo">
-                    <i class="fas fa-clipboard-list"></i>
-                    <span>JM TECNOLOGIA</span>
-                </div>
-                <div class="header-actions">
-                    <div class="connection-status">
-                        <div class="status-indicator" id="statusIndicator"></div>
-                        <span id="statusText">Conectando...</span>
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Navigation Tabs -->
+            <div class="nav-tabs">
+                <button class="nav-tab active" onclick="showTab('create')">
+                    <i class="fas fa-plus"></i> Criar
+                </button>
+                <button class="nav-tab" onclick="showTab('list')">
+                    <i class="fas fa-list"></i> Documentos
+                </button>
+                <button class="nav-tab" onclick="showTab('export')">
+                    <i class="fas fa-download"></i> Exportar
+                </button>
+            </div>
+
+            <!-- Create Tab -->
+            <div id="createTab" class="tab-content active">
+                <form id="documentForm">
+                    <!-- Basic Information -->
+                    <div class="form-section">
+                        <h3><i class="fas fa-info-circle"></i> Informações Básicas</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="codigo">Código (Automático)</label>
+                                <input type="text" id="codigo" class="form-control" readonly>
+                            </div>
+                            <div class="form-group">
+                                <label for="status">Status</label>
+                                <select id="status" class="form-control">
+                                    <option value="Ativo">Ativo</option>
+                                    <option value="Inativo">Inativo</option>
+                                    <option value="Concluído">Concluído</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row full">
+                            <div class="form-group">
+                                <label for="titulo">Título</label>
+                                <input type="text" id="titulo" class="form-control" placeholder="Digite o título do caso de uso">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="autor">Autor</label>
+                                <input type="text" id="autor" class="form-control" placeholder="Nome do autor">
+                            </div>
+                            <div class="form-group">
+                                <label for="responsavel">Responsável</label>
+                                <input type="text" id="responsavel" class="form-control" placeholder="Nome do responsável">
+                            </div>
+                        </div>
                     </div>
-                    <div class="user-info">
-                        <span id="userEmail"></span>
-                        <button class="logout-btn" onclick="logout()">
-                            <i class="fas fa-sign-out-alt"></i>
-                            Sair
+
+                    <!-- Description -->
+                    <div class="form-section">
+                        <h3><i class="fas fa-align-left"></i> Descrição</h3>
+                        <div class="form-row full">
+                            <div class="form-group">
+                                <label for="descricao">Descrição do Caso de Uso</label>
+                                <textarea id="descricao" class="form-control" placeholder="Descreva o objetivo e contexto do caso de uso"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Problem and Solution -->
+                    <div class="form-section">
+                        <h3><i class="fas fa-lightbulb"></i> Problema e Solução</h3>
+                        <div class="form-row full">
+                            <div class="form-group">
+                                <label for="problema">Problema</label>
+                                <textarea id="problema" class="form-control" placeholder="Descreva o problema que este caso de uso resolve"></textarea>
+                            </div>
+                        </div>
+                        <div class="form-row full">
+                            <div class="form-group">
+                                <label for="solucao">Solução</label>
+                                <textarea id="solucao" class="form-control" placeholder="Descreva a solução proposta"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Subtasks -->
+                    <div class="form-section">
+                        <h3><i class="fas fa-tasks"></i> Subtarefas</h3>
+                        <button type="button" class="btn-secondary" onclick="addSubtask()">
+                            <i class="fas fa-plus"></i> Adicionar Subtarefa
+                        </button>
+                        <div id="subtasksContainer" class="subtasks-container"></div>
+                    </div>
+
+                    <!-- File Attachments -->
+                    <div class="form-section">
+                        <h3><i class="fas fa-paperclip"></i> Anexos</h3>
+                        <div class="file-upload-area" id="fileUploadArea">
+                            <i class="fas fa-cloud-upload-alt" style="font-size: 2rem; color: var(--text-muted); margin-bottom: 1rem;"></i>
+                            <p>Arraste arquivos aqui ou clique para selecionar</p>
+                            <p style="font-size: 0.9rem; color: var(--text-muted);">Formatos: PDF, DOC, DOCX, XLS, XLSX, PNG, JPG (máx. 10MB)</p>
+                        </div>
+                        <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" style="display: none;">
+                        <div id="fileList" class="file-list"></div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="form-section">
+                        <button type="submit" class="btn-success">
+                            <i class="fas fa-save"></i> Salvar Documento
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- List Tab -->
+            <div id="listTab" class="tab-content">
+                <div class="documents-header">
+                    <h2>Documentos Cadastrados</h2>
+                    <button class="btn-primary" onclick="loadDocuments()">
+                        <i class="fas fa-sync"></i> Atualizar
+                    </button>
+                </div>
+
+                <div class="search-filters">
+                    <input type="text" id="searchInput" class="search-input" placeholder="Buscar por título, código, autor...">
+                    <select id="statusFilter" class="filter-select">
+                        <option value="">Todos os Status</option>
+                        <option value="Ativo">Ativo</option>
+                        <option value="Inativo">Inativo</option>
+                        <option value="Concluído">Concluído</option>
+                    </select>
+                </div>
+
+                <div id="documentsGrid" class="documents-grid">
+                    <!-- Documents will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Export Tab -->
+            <div id="exportTab" class="tab-content">
+                <div class="export-section">
+                    <h3><i class="fas fa-download"></i> Exportar Documentos</h3>
+                    <p>Exporte todos os documentos em diferentes formatos:</p>
+                    <div class="export-buttons">
+                        <button class="export-btn" onclick="exportToPDF()">
+                            <i class="fas fa-file-pdf"></i>
+                            PDF
+                        </button>
+                        <button class="export-btn" onclick="exportToExcel()">
+                            <i class="fas fa-file-excel"></i>
+                            Excel
+                        </button>
+                        <button class="export-btn" onclick="exportToWord()">
+                            <i class="fas fa-file-word"></i>
+                            Word
+                        </button>
+                        <button class="export-btn" onclick="exportToJSON()">
+                            <i class="fas fa-file-code"></i>
+                            JSON
                         </button>
                     </div>
                 </div>
             </div>
-        </header>
+        </div>
 
-        <!-- Main Container -->
-        <div class="container">
-            <!-- Main Content -->
-            <div class="main-content">
-                <!-- Navigation Tabs -->
-                <div class="nav-tabs">
-                    <button class="nav-tab active" onclick="showTab('create')">
-                        <i class="fas fa-plus"></i> Criar
-                    </button>
-                    <button class="nav-tab" onclick="showTab('list')">
-                        <i class="fas fa-list"></i> Documentos
-                    </button>
-                    <button class="nav-tab" onclick="showTab('export')">
-                        <i class="fas fa-download"></i> Exportar
-                    </button>
-                </div>
-
-                <!-- Create Tab -->
-                <div id="createTab" class="tab-content active">
-                    <form id="documentForm">
-                        <!-- Basic Information -->
-                        <div class="form-section">
-                            <h3><i class="fas fa-info-circle"></i> Informações Básicas</h3>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="codigo">Código (Automático)</label>
-                                    <input type="text" id="codigo" class="form-control" readonly>
-                                </div>
-                                <div class="form-group">
-                                    <label for="status">Status</label>
-                                    <select id="status" class="form-control">
-                                        <option value="Ativo">Ativo</option>
-                                        <option value="Inativo">Inativo</option>
-                                        <option value="Concluído">Concluído</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="form-row full">
-                                <div class="form-group">
-                                    <label for="titulo">Título</label>
-                                    <input type="text" id="titulo" class="form-control" placeholder="Digite o título do caso de uso">
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="autor">Autor</label>
-                                    <input type="text" id="autor" class="form-control" placeholder="Nome do autor">
-                                </div>
-                                <div class="form-group">
-                                    <label for="responsavel">Responsável</label>
-                                    <input type="text" id="responsavel" class="form-control" placeholder="Nome do responsável">
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Description -->
-                        <div class="form-section">
-                            <h3><i class="fas fa-align-left"></i> Descrição</h3>
-                            <div class="form-row full">
-                                <div class="form-group">
-                                    <label for="descricao">Descrição do Caso de Uso</label>
-                                    <textarea id="descricao" class="form-control" placeholder="Descreva o objetivo e contexto do caso de uso"></textarea>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Problem and Solution -->
-                        <div class="form-section">
-                            <h3><i class="fas fa-lightbulb"></i> Problema e Solução</h3>
-                            <div class="form-row full">
-                                <div class="form-group">
-                                    <label for="problema">Problema</label>
-                                    <textarea id="problema" class="form-control" placeholder="Descreva o problema que este caso de uso resolve"></textarea>
-                                </div>
-                            </div>
-                            <div class="form-row full">
-                                <div class="form-group">
-                                    <label for="solucao">Solução</label>
-                                    <textarea id="solucao" class="form-control" placeholder="Descreva a solução proposta"></textarea>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Subtasks -->
-                        <div class="form-section">
-                            <h3><i class="fas fa-tasks"></i> Subtarefas</h3>
-                            <button type="button" class="btn-secondary" onclick="addSubtask()">
-                                <i class="fas fa-plus"></i> Adicionar Subtarefa
-                            </button>
-                            <div id="subtasksContainer" class="subtasks-container"></div>
-                        </div>
-
-                        <!-- File Attachments -->
-                        <div class="form-section">
-                            <h3><i class="fas fa-paperclip"></i> Anexos</h3>
-                            <div class="file-upload-area" id="fileUploadArea">
-                                <i class="fas fa-cloud-upload-alt" style="font-size: 2rem; color: var(--text-muted); margin-bottom: 1rem;"></i>
-                                <p>Arraste arquivos aqui ou clique para selecionar</p>
-                                <p style="font-size: 0.9rem; color: var(--text-muted);">Formatos: PDF, DOC, DOCX, XLS, XLSX, PNG, JPG (máx. 10MB)</p>
-                            </div>
-                            <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" style="display: none;">
-                            <div id="fileList" class="file-list"></div>
-                        </div>
-
-                        <!-- Actions -->
-                        <div class="form-section">
-                            <button type="submit" class="btn-success">
-                                <i class="fas fa-save"></i> Salvar Documento
-                            </button>
-                        </div>
-                    </form>
-                </div>
-
-                <!-- List Tab -->
-                <div id="listTab" class="tab-content">
-                    <div class="documents-header">
-                        <h2>Documentos Cadastrados</h2>
-                        <button class="btn-primary" onclick="loadDocuments()">
-                            <i class="fas fa-sync"></i> Atualizar
-                        </button>
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <!-- Mariano Assistant -->
+            <div class="mariano-section">
+                <div class="mariano-header">
+                    <div class="mariano-avatar">
+                        <i class="fas fa-robot"></i>
                     </div>
-
-                    <div class="search-filters">
-                        <input type="text" id="searchInput" class="search-input" placeholder="Buscar por título, código, autor...">
-                        <select id="statusFilter" class="filter-select">
-                            <option value="">Todos os Status</option>
-                            <option value="Ativo">Ativo</option>
-                            <option value="Inativo">Inativo</option>
-                            <option value="Concluído">Concluído</option>
-                        </select>
-                    </div>
-
-                    <div id="documentsGrid" class="documents-grid">
-                        <!-- Documents will be loaded here -->
+                    <div>
+                        <h3>Mariano</h3>
+                        <p style="font-size: 0.9rem; color: var(--text-muted);">Seu assistente para casos de uso</p>
                     </div>
                 </div>
-
-                <!-- Export Tab -->
-                <div id="exportTab" class="tab-content">
-                    <div class="export-section">
-                        <h3><i class="fas fa-download"></i> Exportar Documentos</h3>
-                        <p>Exporte todos os documentos em diferentes formatos:</p>
-                        <div class="export-buttons">
-                            <button class="export-btn" onclick="exportToPDF()">
-                                <i class="fas fa-file-pdf"></i>
-                                PDF
-                            </button>
-                            <button class="export-btn" onclick="exportToExcel()">
-                                <i class="fas fa-file-excel"></i>
-                                Excel
-                            </button>
-                            <button class="export-btn" onclick="exportToWord()">
-                                <i class="fas fa-file-word"></i>
-                                Word
-                            </button>
-                            <button class="export-btn" onclick="exportToJSON()">
-                                <i class="fas fa-file-code"></i>
-                                JSON
-                            </button>
-                        </div>
-                    </div>
+                <div class="mariano-content">
+                    <p>Olá! Sou o Mariano, seu assistente para casos de uso. Como posso ajudar você hoje?</p>
+                </div>
+                <div class="mariano-input-group">
+                    <input type="text" id="marianoInput" class="mariano-input" placeholder="Faça uma pergunta...">
+                    <button class="ask-mariano-btn" onclick="askMariano()">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
                 </div>
             </div>
 
-            <!-- Sidebar -->
-            <div class="sidebar">
-                <!-- Mariano Assistant -->
-                <div class="mariano-section">
-                    <div class="mariano-header">
-                        <div class="mariano-avatar">
-                            <i class="fas fa-robot"></i>
-                        </div>
-                        <div>
-                            <h3>Mariano</h3>
-                            <p style="font-size: 0.9rem; color: var(--text-muted);">Seu assistente para casos de uso</p>
-                        </div>
+            <!-- AI Assistant with Gemini -->
+            <div class="ai-section">
+                <div class="ai-header">
+                    <div class="ai-avatar">
+                        <i class="fas fa-brain"></i>
                     </div>
-                    <div class="mariano-content">
-                        <p>Olá! Sou o Mariano, seu assistente para casos de uso. Como posso ajudar você hoje?</p>
-                    </div>
-                    <div class="mariano-input-group">
-                        <input type="text" id="marianoInput" class="mariano-input" placeholder="Faça uma pergunta...">
-                        <button class="ask-mariano-btn" onclick="askMariano()">
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
+                    <div>
+                        <h3>Assistente IA</h3>
+                        <p style="font-size: 0.9rem; color: var(--text-muted);">Powered by Gemini</p>
                     </div>
                 </div>
-
-                <!-- AI Assistant -->
-                <div class="ai-section">
-                    <div class="ai-header">
-                        <div class="ai-avatar">
-                            <i class="fas fa-brain"></i>
-                        </div>
-                        <div>
-                            <h3>Assistente IA</h3>
-                            <p style="font-size: 0.9rem; color: var(--text-muted);">Powered by Gemini</p>
-                        </div>
-                    </div>
-                    <div class="ai-content" id="aiContent">
-                        <p>Olá! Sou seu assistente de IA. Posso ajudar você a criar casos de uso mais detalhados, sugerir melhorias e responder perguntas técnicas.</p>
-                    </div>
-                    <div class="ai-input-group">
-                        <input type="text" id="aiInput" class="ai-input" placeholder="Pergunte algo sobre seu caso de uso...">
-                        <button class="ask-ai-btn" onclick="askAI()" id="askAIBtn">
-                            <i class="fas fa-magic"></i>
-                        </button>
-                    </div>
+                <div class="ai-content" id="aiContent">
+                    <p>Olá! Sou seu assistente de IA. Posso ajudar você a criar casos de uso mais detalhados, sugerir melhorias e responder perguntas técnicas.</p>
+                </div>
+                <div class="ai-input-group">
+                    <input type="text" id="aiInput" class="ai-input" placeholder="Pergunte algo sobre seu caso de uso...">
+                    <button class="ask-ai-btn" onclick="askAI()" id="askAIBtn">
+                        <i class="fas fa-magic"></i>
+                    </button>
                 </div>
             </div>
         </div>
@@ -1191,99 +1134,22 @@
         let documents = [];
         let subtaskCounter = 0;
         let uploadedFiles = [];
-        let currentUser = null;
         let genAI = null;
 
         // Initialize Gemini AI
         try {
-            genAI = new GoogleGenerativeAI('AIzaSyBJqssqp4_4rLOvbhgbzI-Zt8Zt8Zt8Zt8'); // Replace with your API key
+            // Replace with your actual Gemini API key
+            genAI = new GoogleGenerativeAI('YOUR_GEMINI_API_KEY_HERE');
         } catch (error) {
             console.log('Gemini AI not available:', error);
         }
 
-        // Authorized emails
-        const authorizedEmails = [
-            'josimar@jmtecnologia.com.br',
-            'admin@jmtecnologia.com.br',
-            'suporte@jmtecnologia.com.br'
-        ];
-
-        // Authentication
-        window.auth.onAuthStateChanged((user) => {
-            if (user && authorizedEmails.includes(user.email)) {
-                currentUser = user;
-                document.getElementById('userEmail').textContent = user.email;
-                document.getElementById('loginScreen').classList.add('hidden');
-                document.getElementById('mainApp').classList.remove('hidden');
-                initializeApp();
-            } else {
-                if (user) {
-                    showNotification('Email não autorizado para acesso ao sistema', 'error');
-                    logout();
-                } else {
-                    document.getElementById('loginScreen').classList.remove('hidden');
-                    document.getElementById('mainApp').classList.add('hidden');
-                }
-            }
-        });
-
-        // Login form
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('loginEmail').value;
-            const password = document.getElementById('loginPassword').value;
-            const loginBtn = document.getElementById('loginBtn');
-
-            loginBtn.disabled = true;
-            loginBtn.innerHTML = '<div class="spinner"></div> Entrando...';
-
-            try {
-                await window.firebaseModules.signInWithEmailAndPassword(window.auth, email, password);
-            } catch (error) {
-                console.error('Login error:', error);
-                showNotification('Erro no login: ' + error.message, 'error');
-            } finally {
-                loginBtn.disabled = false;
-                loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Entrar';
-            }
-        });
-
-        // Logout function
-        window.logout = async function() {
-            try {
-                await window.firebaseModules.signOut(window.auth);
-                showNotification('Logout realizado com sucesso', 'success');
-            } catch (error) {
-                console.error('Logout error:', error);
-                showNotification('Erro no logout', 'error');
-            }
-        };
-
-        // Initialize application
-        function initializeApp() {
-            updateConnectionStatus('connecting');
-            generateNextCode();
-            initFileUpload();
-            
-            // Test Firebase connection
-            window.firebaseModules.getDocs(window.firebaseModules.collection(window.db, 'documentos'))
-                .then(() => {
-                    updateConnectionStatus('online');
-                    showNotification('Sistema conectado com sucesso!', 'success');
-                })
-                .catch((error) => {
-                    console.error('Connection error:', error);
-                    updateConnectionStatus('offline');
-                    showNotification('Erro de conexão com Firebase', 'error');
-                });
-        }
-
         // Connection status
         function updateConnectionStatus(status) {
-            const indicator = document.getElementById('statusIndicator');
+            const dot = document.getElementById('statusDot');
             const text = document.getElementById('statusText');
             
-            indicator.className = 'status-indicator status-' + status;
+            dot.className = 'status-dot status-' + status;
             
             switch(status) {
                 case 'online':
@@ -1340,6 +1206,12 @@
                 document.getElementById('codigo').value = 'UC-001';
             }
         }
+
+        // Initialize on load
+        window.addEventListener('load', () => {
+            generateNextCode();
+            initFileUpload();
+        });
 
         // Subtasks management
         window.addSubtask = function() {
@@ -1667,10 +1539,10 @@
             
             let filteredDocs = documents.filter(doc => {
                 const matchesSearch = !searchTerm || 
-                    doc.titulo?.toLowerCase().includes(searchTerm) ||
-                    doc.codigo?.toLowerCase().includes(searchTerm) ||
-                    doc.autor?.toLowerCase().includes(searchTerm) ||
-                    doc.descricao?.toLowerCase().includes(searchTerm);
+                    doc.titulo.toLowerCase().includes(searchTerm) ||
+                    doc.codigo.toLowerCase().includes(searchTerm) ||
+                    (doc.autor && doc.autor.toLowerCase().includes(searchTerm)) ||
+                    (doc.descricao && doc.descricao.toLowerCase().includes(searchTerm));
                 
                 const matchesStatus = !statusFilter || doc.status === statusFilter;
                 
@@ -1865,18 +1737,14 @@
                 return 'Para excluir um documento, clique no ícone de lixeira na lista. Será solicitada uma senha de segurança. Senhas válidas começam com "josimar". ATENÇÃO: A exclusão é permanente e não pode ser desfeita!';
             }
             
-            if (q.includes('login') || q.includes('acesso')) {
-                return 'O sistema possui controle de acesso. Apenas usuários autorizados podem fazer login. Os emails autorizados são gerenciados no Firebase. Entre em contato com o administrador para solicitar acesso.';
-            }
-            
             if (q.includes('problema') || q.includes('erro')) {
-                return 'Se encontrar problemas: 1) Verifique sua conexão (indicador no topo); 2) Recarregue a página; 3) Verifique se está logado; 4) Contate o suporte técnico. O sistema salva automaticamente no Firebase.';
+                return 'Se encontrar problemas: 1) Verifique sua conexão (indicador no topo); 2) Recarregue a página; 3) Contate o suporte técnico. O sistema salva automaticamente no Firebase.';
             }
             
             return 'Olá! Sou o Mariano, seu assistente para casos de uso. Posso ajudar com: criação de documentos, numeração automática, subtarefas, anexos, exportação, busca e filtros. Faça uma pergunta específica sobre qualquer funcionalidade!';
         }
 
-        // AI Assistant
+        // AI Assistant with Gemini
         window.askAI = async function() {
             const question = document.getElementById('aiInput').value.trim();
             if (!question) {
