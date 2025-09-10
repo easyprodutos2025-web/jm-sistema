@@ -2050,6 +2050,61 @@
                 });
         });
     </script>
+    <!-- 🚀 Bloco da IA -->
+<section id="aiSection" class="content-section">
+  <div style="margin:2rem; padding:1.5rem; border:1px solid #333; border-radius:10px; background:rgba(255,255,255,0.05);">
+    <h3 style="margin-bottom:1rem;">🤖 Perguntar para a IA (Gemini)</h3>
+    <textarea id="perguntaIA" class="form-control" placeholder="Digite sua pergunta para a IA..." rows="3"></textarea>
+    <button onclick="perguntarIA()" class="btn" style="margin-top:1rem;">
+      <i class="fas fa-paper-plane"></i> Perguntar
+    </button>
+    <pre id="saidaIA" style="margin-top:1rem; white-space:pre-wrap;"></pre>
+  </div>
+</section>
+<!-- ============================ -->
+<!-- 🚀 Script: IA Firebase Gemini -->
+<!-- ============================ -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+  import { getGenerativeModel } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-ai.js";
+
+  // 🔑 Sua config Firebase
+  const firebaseConfig = {
+    apiKey: "AIzaSyCNCheV1ezBEcilueuGuWM9FF4Pn8pBhXo",
+    authDomain: "jm-tecnologia-use-cases.firebaseapp.com",
+    projectId: "jm-tecnologia-use-cases",
+    storageBucket: "jm-tecnologia-use-cases.firebasestorage.app",
+    messagingSenderId: "1039370626796",
+    appId: "1:1039370626796:web:db89f13b918d377e6667c9",
+    measurementId: "G-EJQNDRXELH"
+  };
+
+  const app = initializeApp(firebaseConfig);
+
+  // ⚡ Modelo Gemini
+  const model = getGenerativeModel({ model: "gemini-1.5-flash" });
+
+  // Função para perguntar
+  async function perguntarIA() {
+    const pergunta = document.getElementById("perguntaIA").value.trim();
+    if (!pergunta) {
+      document.getElementById("saidaIA").innerText = "⚠️ Digite uma pergunta.";
+      return;
+    }
+
+    document.getElementById("saidaIA").innerText = "⏳ Pensando...";
+
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: pergunta }] }],
+    });
+
+    document.getElementById("saidaIA").innerText =
+      result.response.candidates[0].content.parts[0].text;
+  }
+
+  window.perguntarIA = perguntarIA;
+</script>
+
 </body>
     <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
