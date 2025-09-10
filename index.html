@@ -2051,5 +2051,50 @@
         });
     </script>
 </body>
+    <script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+  import { getGenerativeModel } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-ai.js";
+
+  // 🔑 Sua configuração já existente
+  const firebaseConfig = {
+    apiKey: "AIzaSyCNCheV1ezBEcilueuGuWM9FF4Pn8pBhXo",
+    authDomain: "jm-tecnologia-use-cases.firebaseapp.com",
+    projectId: "jm-tecnologia-use-cases",
+    storageBucket: "jm-tecnologia-use-cases.firebasestorage.app",
+    messagingSenderId: "1039370626796",
+    appId: "1:1039370626796:web:9ab17b48c6b9edf96667c9",
+    measurementId: "G-V9JQNCC2Y1"
+  };
+
+  // Inicializa Firebase
+  const app = initializeApp(firebaseConfig);
+
+  // ⚡ Cria o modelo Gemini
+  const model = getGenerativeModel({
+    model: "gemini-1.5-flash",
+  });
+
+  // Função para testar
+  async function perguntarIA() {
+    const result = await model.generateContent({
+      contents: [
+        { role: "user", parts: [{ text: "Me explique o agro brasileiro em 2 frases engraçadas" }] }
+      ],
+    });
+
+    document.getElementById("saidaIA").innerText =
+      result.response.candidates[0].content.parts[0].text;
+  }
+
+  // Deixa a função disponível no HTML
+  window.perguntarIA = perguntarIA;
+        <div style="margin:2rem; padding:1rem; border:1px solid #333; border-radius:10px;">
+  <h3>🤖 Perguntar para a IA</h3>
+  <button onclick="perguntarIA()">Perguntar</button>
+  <pre id="saidaIA" style="margin-top:1rem; white-space:pre-wrap;"></pre>
+</div>
+
+</script>
+
 </html>
 
